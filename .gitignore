@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+~$*.xlsx
+
+# 원자료 — 발주·입고 원본 데이터는 저장소에 포함하지 않는다
+*_발주_입고_횟수_*.xlsx

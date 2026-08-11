@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>재고 적정 판매가 산출</title>
+<style>
+:root{
+  color-scheme: light;
+  --surface-1:#fcfcfb; --plane:#f9f9f7;
+  --ink-1:#0b0b0b; --ink-2:#52514e; --ink-3:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
+  --g-a:#0ca30c; --g-b:#2a78d6; --g-c:#c98500; --g-d:#d03b3b; --g-f:#898781;
+  --accent:#2a78d6;
+}
+@media (prefers-color-scheme: dark){:root:where(:not([data-theme="light"])){
+  color-scheme: dark;
+  --surface-1:#1a1a19; --plane:#0d0d0d;
+  --ink-1:#fff; --ink-2:#c3c2b7; --ink-3:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --g-a:#0ca30c; --g-b:#3987e5; --g-c:#c98500; --g-d:#d03b3b; --g-f:#898781;
+  --accent:#3987e5;
+}}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --surface-1:#1a1a19; --plane:#0d0d0d;
+  --ink-1:#fff; --ink-2:#c3c2b7; --ink-3:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --g-a:#0ca30c; --g-b:#3987e5; --g-c:#c98500; --g-d:#d03b3b; --g-f:#898781;
+  --accent:#3987e5;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink-1);
+  font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic",sans-serif;
+  font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding:28px 20px 80px}
+h1{font-size:26px;line-height:1.25;margin:0 0 6px;letter-spacing:-.02em}
+h2{font-size:17px;margin:0 0 14px;letter-spacing:-.01em}
+.sub{color:var(--ink-2);margin:0 0 26px;max-width:70ch}
+.card{background:var(--surface-1);border:1px solid var(--ring);border-radius:12px;padding:20px;margin-bottom:18px}
+/* stat tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px}
+.tile{background:var(--surface-1);border:1px solid var(--ring);border-radius:12px;padding:16px 18px}
+.tile .k{font-size:12px;color:var(--ink-2);margin-bottom:6px}
+.tile .v{font-size:27px;font-weight:640;letter-spacing:-.02em;line-height:1.15}
+.tile .n{font-size:11.5px;color:var(--ink-3);margin-top:4px}
+/* grade chart — horizontal bars, labels in ink */
+.gchart{display:grid;grid-template-columns:auto 1fr auto;gap:9px 12px;align-items:center}
+.gchart .gl{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+.gchart .gl b{color:var(--ink-1);font-size:13px;width:12px;display:inline-block}
+.gtrack{background:var(--grid);border-radius:4px;height:20px;overflow:hidden}
+.gtrack i{display:block;height:100%;border-radius:0 4px 4px 0;transition:width .25s}
+.gval{font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink-1);font-weight:620;white-space:nowrap}
+.gval span{color:var(--ink-3);font-weight:400;margin-left:5px}
+.dot{width:9px;height:9px;border-radius:2px;flex:none}
+/* controls */
+.ctrls{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end}
+.fld{display:flex;flex-direction:column;gap:5px}
+.fld label{font-size:11.5px;color:var(--ink-2);font-weight:560}
+input[type=search],select{background:var(--plane);color:var(--ink-1);border:1px solid var(--axis);
+  border-radius:7px;padding:7px 10px;font:inherit;font-size:13px;min-width:150px}
+input[type=range]{width:150px;accent-color:var(--accent)}
+.mv{font-variant-numeric:tabular-nums;color:var(--ink-1);font-weight:600;font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--axis);background:var(--plane);color:var(--ink-2);border-radius:999px;
+  padding:5px 11px;font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit}
+.chip[aria-pressed=true]{border-color:var(--accent);color:var(--ink-1);background:color-mix(in srgb,var(--accent) 12%,transparent);font-weight:600}
+.btn{border:1px solid var(--axis);background:var(--plane);color:var(--ink-1);border-radius:7px;
+  padding:8px 14px;font:inherit;font-size:13px;font-weight:560;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+/* table */
+.tblwrap{overflow-x:auto;border:1px solid var(--ring);border-radius:12px;background:var(--surface-1)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:8px 11px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--grid)}
+th{position:sticky;top:0;background:var(--surface-1);color:var(--ink-2);font-size:11.5px;font-weight:620;
+  text-align:right;cursor:pointer;user-select:none;z-index:2;box-shadow:inset 0 -1px var(--axis)}
+th:hover{color:var(--ink-1)}
+th.l,td.l{text-align:left}
+td{font-variant-numeric:tabular-nums;color:var(--ink-2)}
+td.pn{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--ink-1);font-size:12.5px}
+td.hero{color:var(--ink-1);font-weight:650}
+tbody tr:hover{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.gb{display:inline-flex;align-items:center;gap:5px;font-weight:640;font-size:12px;color:var(--ink-1)}
+.muted{color:var(--ink-3)}
+.foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;
+  padding:12px 4px;font-size:12.5px;color:var(--ink-2)}
+details{border-top:1px solid var(--grid);padding:14px 0}
+details summary{cursor:pointer;font-weight:620;font-size:14px;color:var(--ink-1)}
+details[open] summary{margin-bottom:10px}
+details p,details li{color:var(--ink-2);max-width:80ch}
+code{background:var(--plane);border:1px solid var(--ring);border-radius:4px;padding:1.5px 5px;
+  font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:var(--ink-1)}
+.eq{background:var(--plane);border:1px solid var(--ring);border-left:3px solid var(--accent);
+  border-radius:6px;padding:11px 14px;margin:10px 0;font-family:ui-monospace,Consolas,monospace;
+  font-size:12.5px;overflow-x:auto;color:var(--ink-1)}
+.warn{border-left:3px solid var(--g-d);background:color-mix(in srgb,var(--g-d) 8%,transparent);
+  border-radius:6px;padding:11px 14px;margin:12px 0;font-size:13px;color:var(--ink-2)}
+.thm{position:absolute;top:20px;right:20px}
+@media(max-width:640px){.wrap{padding:20px 13px 60px}h1{font-size:21px}.tile .v{font-size:23px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<button class="btn thm" id="thm" type="button">◐ 테마</button>
+
+<h1>재고 적정 판매가 산출</h1>
+<p class="sub">선입선출(FIFO)이 관리되지 않아 발주가·입고가를 그대로 신뢰할 수 없는 재고 데이터에서,
+<strong>가격 미기재(0원) 레코드를 보정</strong>해 부품별 유효원가와 판매가를 산출했습니다.
+마진율을 조정하면 표가 즉시 갱신됩니다.</p>
+
+<div class="tiles" id="tiles"></div>
+
+<div class="card">
+  <h2>신뢰 등급 분포</h2>
+  <div class="gchart" id="gchart"></div>
+</div>
+
+<div class="card">
+  <h2>마진율 설정</h2>
+  <div class="ctrls">
+    <div class="fld"><label for="m1">보수가 마진</label>
+      <input type="range" id="m1" min="0" max="150" step="5" value="15"><span class="mv" id="m1v">+15%</span></div>
+    <div class="fld"><label for="m2">권장가 마진</label>
+      <input type="range" id="m2" min="0" max="150" step="5" value="30"><span class="mv" id="m2v">+30%</span></div>
+    <div class="fld"><label for="m3">공격가 마진</label>
+      <input type="range" id="m3" min="0" max="150" step="5" value="45"><span class="mv" id="m3v">+45%</span></div>
+    <button class="btn" id="reset" type="button">기본값</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>부품 목록</h2>
+  <div class="ctrls" style="margin-bottom:14px">
+    <div class="fld"><label for="q">품번 검색</label>
+      <input type="search" id="q" placeholder="품번 일부 입력" autocomplete="off"></div>
+    <div class="fld"><label>신뢰 등급</label><div class="chips" id="gchips"></div></div>
+    <div class="fld"><label for="pp">표시 행수</label>
+      <select id="pp"><option>50</option><option selected>100</option><option>300</option><option value="99999">전체</option></select></div>
+    <button class="btn pri" id="csv" type="button">CSV 내려받기</button>
+  </div>
+  <div class="tblwrap">
+    <table>
+      <thead><tr id="thr"></tr></thead>
+      <tbody id="tb"></tbody>
+    </table>
+  </div>
+  <div class="foot"><span id="cnt"></span>
+    <span><button class="btn" id="prev" type="button">이전</button>
+    <span id="pg" style="margin:0 10px"></span>
+    <button class="btn" id="next" type="button">다음</button></span></div>
+</div>
+
+<div class="card">
+  <h2>산출 방법론</h2>
+
+  <details open><summary>1. 이 데이터의 근본 문제</summary>
+    <p>원본은 부품별 <strong>집계값</strong>만 담고 있습니다 — 발주/입고 횟수, 발주평균가, 입고평균가,
+    전체평균가·최소가·최대가. 개별 거래 내역이 없어 선입선출 원가를 역산할 수 없습니다.
+    그런데 데이터를 검증하면서 두 가지 구조적 결함을 확인했습니다.</p>
+    <p><strong>(가) 발주평균가·입고평균가는 '단가'가 아니다.</strong>
+    2,179행 <em>전부</em>에서 <code>발주평균가 + 입고평균가 = 전체평균가</code>가 성립합니다.
+    즉 두 값은 각자의 건수가 아니라 <strong>전체 건수(CNT)로 나눈 기여분</strong>입니다.
+    실제 단가를 보려면 되돌려야 합니다.</p>
+    <div class="eq">발주단가 = 발주평균가 × CNT ÷ 발주건수<br>입고단가 = 입고평균가 × CNT ÷ 입고건수</div>
+    <p><strong>(나) 0원은 '무료'가 아니라 '미기재'다.</strong>
+    이게 핵심입니다. CNT=2이고 최소가=0, 최대가&gt;0인 365개 부품 <em>전부</em>가
+    <code>전체평균가 = 전체최대가 ÷ 2</code>를 정확히 만족합니다.
+    한 건은 가격이 있고 다른 한 건은 0원이라 평균이 정확히 절반으로 희석된 것입니다.</p>
+    <div class="eq">51747255413 → 발주 1건 @ 127,200원 · 입고 1건 @ <strong>0원</strong><br>
+    전체평균가 63,600원 &nbsp;=&nbsp; 127,200 ÷ 2 &nbsp;← 실제 원가의 <strong>절반</strong></div>
+    <p>CNT=1인 부품 959개 중 410개(42.8%)가 가격 0원입니다. 즉 <strong>약 45%의 레코드에 가격이 기재되어 있지 않고</strong>,
+    이 0원들이 평균에 그대로 섞여 <strong>전체평균가를 구조적으로 끌어내리고 있습니다.</strong>
+    전체평균가를 그대로 원가로 쓰면 손해를 봅니다.</p>
+  </details>
+
+  <details><summary>2. 유효원가 산출 공식</summary>
+    <p>0 오염은 <strong>아래쪽으로만</strong> 작용합니다(가격을 낮추기만 함). 따라서 하한과 상한을 세우고 그 사이를 추정합니다.</p>
+    <div class="eq">원가하한 L = max(전체평균가, 발주단가, 입고단가)  ← 0 오염을 감안한 최선의 하한
+원가상한 U = 전체최대가                      ← 실제로 기재된 가장 높은 가격
+
+미기재추정 z = min( CNT × (1 − 전체평균가/U),   ← 데이터가 허용하는 최대치
+                   CNT × 0.45 )              ← 전사 미기재율 사전값
+
+유효원가 C = 전체평균가 × CNT ÷ (CNT − z),  단 [L, U] 범위로 제한</div>
+    <p>두 항 중 작은 쪽을 쓰는 이유는, 평균과 최대가의 차이가 <em>전부</em> 미기재 때문은 아니기 때문입니다.
+    거래 건수가 많은 부품은 실제 가격 변동(로트별 원가 차이)도 섞여 있어, 45% 사전값으로 상한을 걸어 과대 보정을 막습니다.</p>
+    <p><strong>검증:</strong> 진값을 아는 유형(발주 1건 유가 + 입고 1건 0원)에서 산출 결과가 정확히 최대가와 일치합니다.
+    위 51747255413의 유효원가는 <strong>127,200원</strong>으로 복원됩니다.</p>
+  </details>
+
+  <details><summary>3. 신뢰 등급의 의미</summary>
+    <p>등급은 <code>원가하한 ÷ 원가상한</code>, 즉 <strong>추정 구간이 얼마나 좁은지</strong>로 매깁니다. 구간이 좁을수록 확신이 큽니다.</p>
+    <ul>
+      <li><strong>A</strong> — 하한/상한 비율 ≥ 0.95. 가격이 일관돼 사실상 확정. 단, CNT=1이면 교차검증이 불가한 단일 관측입니다.</li>
+      <li><strong>B</strong> — ≥ 0.60. 편차가 경미해 그대로 사용 가능.</li>
+      <li><strong>C</strong> — ≥ 0.30. 편차가 커 검토 권장.</li>
+      <li><strong>D</strong> — &lt; 0.30. 편차 심각. 판매 전 수동 확인 필수.</li>
+      <li><strong>F</strong> — 전체최대가 = 0. 모든 거래에 가격이 없어 <strong>산출 불가</strong>. 이 파일만으로는 방법이 없습니다.</li>
+    </ul>
+    <div class="warn"><strong>C·D 등급과 F 등급은 일괄 적용 대상이 아닙니다.</strong>
+    C·D는 구간이 넓어 보수가 쪽을 쓰거나 실제 매입 단가를 확인해야 하고,
+    F는 외부 가격표(제조사 MSRP, 공급처 견적)를 붙이는 것 외에 방법이 없습니다.</div>
+  </details>
+
+  <details><summary>4. 한계 — 반드시 알아두실 점</summary>
+    <ul>
+      <li>원본에 <strong>거래 일자와 수량이 없습니다.</strong> 따라서 진짜 FIFO 원가는 계산할 수 없고, 최근 매입가 가중도 불가능합니다. 이 산출은 "시점 무관 대표원가"입니다.</li>
+      <li>미기재율 45%는 <strong>전사 단일값</strong>입니다. 부품별로 실제 미기재율이 다르면 개별 오차가 생깁니다.</li>
+      <li>전체최대가에 <strong>이상치</strong>(오타, 수량 묶음 입력)가 섞였다면 상한이 부풀려집니다. D등급 부품이 특히 의심 대상입니다.</li>
+      <li>마진율은 원가회수 기준일 뿐, <strong>시장 경쟁가·회전율·부품 희소성은 반영되어 있지 않습니다.</strong></li>
+      <li>근본 해결책은 <strong>입고 시 단가 필수 입력</strong>과 로트 단위 관리입니다. 이 산출은 그때까지의 보정책입니다.</li>
+    </ul>
+  </details>
+</div>
+
+<p class="foot muted" id="meta"></p>
+</div>
+
+<script>
+const D = /*__DATA__*/;
+const F = ["품번","발주","입고","CNT","전체평균가","전체최소가","전체최대가","발주단가","입고단가","원가하한","유효원가","원가상한","등급"];
+const I = {}; F.forEach((k,i)=>I[k]=i);
+const GC = {A:"var(--g-a)",B:"var(--g-b)",C:"var(--g-c)",D:"var(--g-d)",F:"var(--g-f)"};
+const GN = {A:"확정 수준",B:"신뢰 가능",C:"검토 권장",D:"수동 확인",F:"산출 불가"};
+const nf = n => n==null ? "—" : n.toLocaleString("ko-KR");
+const S = D.summary, R = D.items;
+let M=[15,30,45], page=0, sortK="CNT", sortD=-1, gsel=new Set(["A","B","C","D","F"]), q="";
+
+const price = (c,m) => { if(!c) return 0; const v=c*(1+m/100);
+  const u = v<1e4?100:(v<1e5?500:1000); return Math.ceil(v/u)*u; };
+
+/* stat tiles */
+function tiles(){
+  const rec = R.filter(r=>r[I.등급]!=="F").reduce((a,r)=>a+price(r[I.유효원가],M[1]),0);
+  const cost = R.reduce((a,r)=>a+r[I.유효원가],0);
+  const raw  = R.reduce((a,r)=>a+r[I.전체평균가],0);
+  const t=[
+    ["전체 부품", nf(S.총부품수)+"개", "일괄처리 대상 재고"],
+    ["판매가 산출 가능", nf(S.산출가능)+"개", (100*S.산출가능/S.총부품수).toFixed(1)+"% · A~D 등급"],
+    ["산출 불가 (F)", nf(S.산출불가)+"개", "모든 거래가 0원 — 외부 가격표 필요"],
+    ["원가 상향 보정", "+"+((cost/raw-1)*100).toFixed(1)+"%", "전체평균가 "+nf(raw)+" → "+nf(cost)+"원"],
+    ["권장 판매가 총액", nf(rec)+"원", "마진 +"+M[1]+"% 기준"],
+  ];
+  document.getElementById("tiles").innerHTML = t.map(([k,v,n])=>
+    `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join("");
+}
+/* grade distribution — horizontal bars */
+function gchart(){
+  const d=S.등급분포, tot=S.총부품수, mx=Math.max(...Object.values(d));
+  document.getElementById("gchart").innerHTML = "ABCDF".split("").map(g=>
+    `<div class="gl"><i class="dot" style="background:${GC[g]}"></i><b>${g}</b>${GN[g]}</div>
+     <div class="gtrack"><i style="width:${100*d[g]/mx}%;background:${GC[g]}"></i></div>
+     <div class="gval">${nf(d[g])}개<span>${(100*d[g]/tot).toFixed(1)}%</span></div>`).join("");
+}
+/* table */
+const COLS=[["품번","l"],["CNT",""],["발주",""],["입고",""],["전체평균가",""],["발주단가",""],["입고단가",""],
+            ["원가하한",""],["유효원가","h"],["원가상한",""],["등급","l"],["보수가",""],["권장가","h"],["공격가",""]];
+function head(){
+  document.getElementById("thr").innerHTML = COLS.map(([k,c])=>
+    `<th class="${c==='l'?'l':''}" data-k="${k}">${k}${sortK===k?(sortD<0?" ▾":" ▴"):""}</th>`).join("");
+  document.querySelectorAll("th").forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k; if(sortK===k) sortD*=-1; else {sortK=k; sortD=-1;} page=0; draw();});
+}
+function filtered(){
+  let a = R.filter(r=>gsel.has(r[I.등급]) && (!q || r[0].toLowerCase().includes(q)));
+  const mi={보수가:0,권장가:1,공격가:2}[sortK];
+  a.sort((x,y)=>{ let vx,vy;
+    if(mi!==undefined){vx=price(x[I.유효원가],M[mi]);vy=price(y[I.유효원가],M[mi]);}
+    else if(sortK==="품번"){return x[0].localeCompare(y[0])*sortD;}
+    else {vx=x[I[sortK]]??-1; vy=y[I[sortK]]??-1;}
+    return (vx-vy)*sortD;});
+  return a;
+}
+function draw(){
+  const a=filtered(), pp=+document.getElementById("pp").value;
+  const np=Math.max(1,Math.ceil(a.length/pp)); page=Math.min(page,np-1);
+  const rows=a.slice(page*pp,(page+1)*pp);
+  document.getElementById("tb").innerHTML = rows.map(r=>{
+    const g=r[I.등급], c=r[I.유효원가], f=g==="F";
+    return `<tr>
+<td class="l pn">${r[0]}</td><td>${r[I.CNT]}</td><td>${r[I.발주]}</td><td>${r[I.입고]}</td>
+<td>${nf(r[I.전체평균가])}</td><td>${nf(r[I.발주단가])}</td><td>${nf(r[I.입고단가])}</td>
+<td>${nf(r[I.원가하한])}</td><td class="hero">${f?'<span class="muted">—</span>':nf(c)}</td><td>${nf(r[I.원가상한])}</td>
+<td class="l"><span class="gb"><i class="dot" style="background:${GC[g]}"></i>${g}</span></td>
+${f?'<td class="muted">—</td><td class="muted">—</td><td class="muted">—</td>'
+   :`<td>${nf(price(c,M[0]))}</td><td class="hero">${nf(price(c,M[1]))}</td><td>${nf(price(c,M[2]))}</td>`}
+</tr>`;}).join("") || `<tr><td colspan="14" class="l muted" style="padding:26px">조건에 맞는 부품이 없습니다.</td></tr>`;
+  document.getElementById("cnt").textContent = `${nf(a.length)}개 부품 (전체 ${nf(R.length)}개 중)`;
+  document.getElementById("pg").textContent = `${page+1} / ${np}`;
+  document.getElementById("prev").disabled = page===0;
+  document.getElementById("next").disabled = page>=np-1;
+  head();
+}
+/* controls */
+[0,1,2].forEach(i=>{
+  const el=document.getElementById("m"+(i+1));
+  el.oninput=()=>{M[i]=+el.value; document.getElementById("m"+(i+1)+"v").textContent="+"+el.value+"%"; tiles(); draw();};
+});
+document.getElementById("reset").onclick=()=>{[15,30,45].forEach((v,i)=>{
+  M[i]=v; const el=document.getElementById("m"+(i+1)); el.value=v;
+  document.getElementById("m"+(i+1)+"v").textContent="+"+v+"%";}); tiles(); draw();};
+document.getElementById("gchips").innerHTML="ABCDF".split("").map(g=>
+  `<button class="chip" type="button" aria-pressed="true" data-g="${g}"><i class="dot" style="background:${GC[g]}"></i>${g}</button>`).join("");
+document.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{
+  const g=b.dataset.g, on=b.getAttribute("aria-pressed")==="true";
+  b.setAttribute("aria-pressed",!on); on?gsel.delete(g):gsel.add(g); page=0; draw();});
+document.getElementById("q").oninput=e=>{q=e.target.value.trim().toLowerCase(); page=0; draw();};
+document.getElementById("pp").onchange=()=>{page=0; draw();};
+document.getElementById("prev").onclick=()=>{page--; draw(); scrollTo({top:document.querySelector(".tblwrap").offsetTop-70,behavior:"smooth"});};
+document.getElementById("next").onclick=()=>{page++; draw(); scrollTo({top:document.querySelector(".tblwrap").offsetTop-70,behavior:"smooth"});};
+document.getElementById("thm").onclick=()=>{
+  const cur=document.documentElement.getAttribute("data-theme");
+  const dark=cur? cur==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.setAttribute("data-theme", dark?"light":"dark");};
+document.getElementById("csv").onclick=()=>{
+  const h=["품번","발주","입고","CNT","전체평균가","전체최소가","전체최대가","발주단가","입고단가",
+           "원가하한","유효원가","원가상한","등급",`보수가(+${M[0]}%)`,`권장가(+${M[1]}%)`,`공격가(+${M[2]}%)`];
+  const lines=[h.join(",")].concat(filtered().map(r=>{
+    const c=r[I.유효원가], f=r[I.등급]==="F";
+    return [r[0],r[I.발주],r[I.입고],r[I.CNT],r[I.전체평균가],r[I.전체최소가],r[I.전체최대가],
+            r[I.발주단가]??"",r[I.입고단가]??"",r[I.원가하한],f?"":c,r[I.원가상한],r[I.등급],
+            f?"":price(c,M[0]),f?"":price(c,M[1]),f?"":price(c,M[2])].join(",");}));
+  const blob=new Blob(["﻿"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download=`적정판매가_마진${M[1]}_${S.기준일}.csv`; a.click(); URL.revokeObjectURL(a.href);};
+document.getElementById("meta").textContent =
+  `기준 데이터: 발주·입고 집계 · 부품 ${nf(S.총부품수)}개 · 생성 ${S.기준일}`;
+tiles(); gchart(); draw();
+</script>
+</body>
+</html>
