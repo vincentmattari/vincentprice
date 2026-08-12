@@ -14,7 +14,16 @@ if not _found:
     sys.exit(f"원본 엑셀을 찾을 수 없습니다. 이 폴더에 {PATTERN} 파일을 두세요.")
 SRC = _found[-1]
 
-rows = list(openpyxl.load_workbook(SRC, data_only=True)["Sheet1"].iter_rows(min_row=2, values_only=True))
+_ws = openpyxl.load_workbook(SRC, data_only=True).worksheets[0]
+_hdr = [str(c.value).strip() if c.value is not None else "" for c in _ws[1]]
+_need = ["부품 품번", "발주", "입고", "CNT", "발주평균가", "입고평균가",
+         "전체평균가", "전체최소가", "전체최대가"]
+_missing = [k for k in _need if k not in _hdr]
+if _missing:
+    sys.exit(f"필수 컬럼 누락: {_missing}\n  발견된 헤더: {_hdr}")
+_ix = [_hdr.index(k) for k in _need]     # 헤더 이름으로 찾아 컬럼 순서 변화에 견딘다
+rows = [tuple(r[i] for i in _ix) for r in _ws.iter_rows(min_row=2, values_only=True)]
+print(f"원본: {SRC}\n행수: {len(rows)}\n")
 ok = True
 
 
@@ -47,8 +56,11 @@ n_half = sum(1 for x in c2z if abs(x[6] - x[8] / 2) <= 1)
 check("CNT=2 & 최소가=0 인 부품에서  전체평균가 == 전체최대가 ÷ 2",
       n_half == len(c2z), f"{n_half}/{len(c2z)}행")
 print("     (2건 중 1건이 0원 → 평균이 정확히 절반으로 희석된다는 직접 증거)")
-for x in c2z[:3]:
-    print(f"     예) {x[0]:<16} 발주1건@{x[4]*2:,} + 입고1건@0  →  평균가 {x[6]:,} = 최대가 {x[8]:,} ÷ 2")
+for x in sorted(c2z, key=lambda r: -r[8])[:3]:          # 금액이 큰 순으로 대표 사례
+    side = "발주" if x[4] > 0 else "입고"               # 가격이 기재된 쪽
+    other = "입고" if side == "발주" else "발주"
+    print(f"     예) {x[0]:<16} {side}1건@{x[8]:,}원 + {other}1건@0원"
+          f"  →  평균가 {x[6]:,}원 = 최대가 {x[8]:,} ÷ 2")
 
 c1 = [x for x in rows if x[3] == 1]
 z1 = [x for x in c1 if x[8] == 0]

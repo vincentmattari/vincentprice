@@ -79,6 +79,8 @@ th:hover{color:var(--ink-1)}
 th.l,td.l{text-align:left}
 td{font-variant-numeric:tabular-nums;color:var(--ink-2)}
 td.pn{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--ink-1);font-size:12.5px}
+td.nm{color:var(--ink-1);max-width:230px;overflow:hidden;text-overflow:ellipsis}
+td.mkr{color:var(--ink-2);font-size:12px;letter-spacing:.02em}
 td.hero{color:var(--ink-1);font-weight:650}
 tbody tr:hover{background:color-mix(in srgb,var(--accent) 6%,transparent)}
 .gb{display:inline-flex;align-items:center;gap:5px;font-weight:640;font-size:12px;color:var(--ink-1)}
@@ -132,8 +134,9 @@ code{background:var(--plane);border:1px solid var(--ring);border-radius:4px;padd
 <div class="card">
   <h2>부품 목록</h2>
   <div class="ctrls" style="margin-bottom:14px">
-    <div class="fld"><label for="q">품번 검색</label>
-      <input type="search" id="q" placeholder="품번 일부 입력" autocomplete="off"></div>
+    <div class="fld"><label for="q">품번 · 부품명 검색</label>
+      <input type="search" id="q" placeholder="품번 또는 부품명 일부" autocomplete="off"></div>
+    <div class="fld"><label for="mk">메이커</label><select id="mk"></select></div>
     <div class="fld"><label>신뢰 등급</label><div class="chips" id="gchips"></div></div>
     <div class="fld"><label for="pp">표시 행수</label>
       <select id="pp"><option>50</option><option selected>100</option><option>300</option><option value="99999">전체</option></select></div>
@@ -219,13 +222,15 @@ code{background:var(--plane);border:1px solid var(--ring);border-radius:4px;padd
 
 <script>
 const D = /*__DATA__*/;
-const F = ["품번","발주","입고","CNT","전체평균가","전체최소가","전체최대가","발주단가","입고단가","원가하한","유효원가","원가상한","등급"];
+const F = ["품번","부품명","메이커","발주","입고","CNT","전체평균가","전체최소가","전체최대가","발주단가","입고단가","원가하한","유효원가","원가상한","등급"];
 const I = {}; F.forEach((k,i)=>I[k]=i);
 const GC = {A:"var(--g-a)",B:"var(--g-b)",C:"var(--g-c)",D:"var(--g-d)",F:"var(--g-f)"};
 const GN = {A:"확정 수준",B:"신뢰 가능",C:"검토 권장",D:"수동 확인",F:"산출 불가"};
 const nf = n => n==null ? "—" : n.toLocaleString("ko-KR");
+const esc = s => String(s).replace(/[&<>"']/g, m =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 const S = D.summary, R = D.items;
-let M=[15,30,45], page=0, sortK="CNT", sortD=-1, gsel=new Set(["A","B","C","D","F"]), q="";
+let M=[15,30,45], page=0, sortK="CNT", sortD=-1, gsel=new Set(["A","B","C","D","F"]), q="", mk="";
 
 const price = (c,m) => { if(!c) return 0; const v=c*(1+m/100);
   const u = v<1e4?100:(v<1e5?500:1000); return Math.ceil(v/u)*u; };
@@ -254,7 +259,8 @@ function gchart(){
      <div class="gval">${nf(d[g])}개<span>${(100*d[g]/tot).toFixed(1)}%</span></div>`).join("");
 }
 /* table */
-const COLS=[["품번","l"],["CNT",""],["발주",""],["입고",""],["전체평균가",""],["발주단가",""],["입고단가",""],
+const COLS=[["품번","l"],["부품명","l"],["메이커","l"],["CNT",""],["발주",""],["입고",""],
+            ["전체평균가",""],["발주단가",""],["입고단가",""],
             ["원가하한",""],["유효원가","h"],["원가상한",""],["등급","l"],["보수가",""],["권장가","h"],["공격가",""]];
 function head(){
   document.getElementById("thr").innerHTML = COLS.map(([k,c])=>
@@ -263,11 +269,14 @@ function head(){
     const k=th.dataset.k; if(sortK===k) sortD*=-1; else {sortK=k; sortD=-1;} page=0; draw();});
 }
 function filtered(){
-  let a = R.filter(r=>gsel.has(r[I.등급]) && (!q || r[0].toLowerCase().includes(q)));
+  let a = R.filter(r=> gsel.has(r[I.등급])
+    && (!mk || r[I.메이커]===mk)
+    && (!q || r[0].toLowerCase().includes(q) || (r[I.부품명]||"").toLowerCase().includes(q)));
   const mi={보수가:0,권장가:1,공격가:2}[sortK];
   a.sort((x,y)=>{ let vx,vy;
     if(mi!==undefined){vx=price(x[I.유효원가],M[mi]);vy=price(y[I.유효원가],M[mi]);}
-    else if(sortK==="품번"){return x[0].localeCompare(y[0])*sortD;}
+    else if(sortK==="품번"||sortK==="부품명"||sortK==="메이커"){
+      return String(x[I[sortK]]||"").localeCompare(String(y[I[sortK]]||""),"ko")*sortD;}
     else {vx=x[I[sortK]]??-1; vy=y[I[sortK]]??-1;}
     return (vx-vy)*sortD;});
   return a;
@@ -278,14 +287,18 @@ function draw(){
   const rows=a.slice(page*pp,(page+1)*pp);
   document.getElementById("tb").innerHTML = rows.map(r=>{
     const g=r[I.등급], c=r[I.유효원가], f=g==="F";
+    const nm=r[I.부품명], mkr=r[I.메이커];
     return `<tr>
-<td class="l pn">${r[0]}</td><td>${r[I.CNT]}</td><td>${r[I.발주]}</td><td>${r[I.입고]}</td>
+<td class="l pn">${r[0]}</td>
+<td class="l nm">${nm?esc(nm):'<span class="muted">—</span>'}</td>
+<td class="l mkr">${mkr?esc(mkr):'<span class="muted">—</span>'}</td>
+<td>${r[I.CNT]}</td><td>${r[I.발주]}</td><td>${r[I.입고]}</td>
 <td>${nf(r[I.전체평균가])}</td><td>${nf(r[I.발주단가])}</td><td>${nf(r[I.입고단가])}</td>
 <td>${nf(r[I.원가하한])}</td><td class="hero">${f?'<span class="muted">—</span>':nf(c)}</td><td>${nf(r[I.원가상한])}</td>
 <td class="l"><span class="gb"><i class="dot" style="background:${GC[g]}"></i>${g}</span></td>
 ${f?'<td class="muted">—</td><td class="muted">—</td><td class="muted">—</td>'
    :`<td>${nf(price(c,M[0]))}</td><td class="hero">${nf(price(c,M[1]))}</td><td>${nf(price(c,M[2]))}</td>`}
-</tr>`;}).join("") || `<tr><td colspan="14" class="l muted" style="padding:26px">조건에 맞는 부품이 없습니다.</td></tr>`;
+</tr>`;}).join("") || `<tr><td colspan="${COLS.length}" class="l muted" style="padding:26px">조건에 맞는 부품이 없습니다.</td></tr>`;
   document.getElementById("cnt").textContent = `${nf(a.length)}개 부품 (전체 ${nf(R.length)}개 중)`;
   document.getElementById("pg").textContent = `${page+1} / ${np}`;
   document.getElementById("prev").disabled = page===0;
@@ -305,6 +318,11 @@ document.getElementById("gchips").innerHTML="ABCDF".split("").map(g=>
 document.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{
   const g=b.dataset.g, on=b.getAttribute("aria-pressed")==="true";
   b.setAttribute("aria-pressed",!on); on?gsel.delete(g):gsel.add(g); page=0; draw();});
+const mkCount = R.reduce((a,r)=>{const m=r[I.메이커]; if(m) a[m]=(a[m]||0)+1; return a;},{});
+document.getElementById("mk").innerHTML = `<option value="">전체 (${nf(R.length)}개)</option>` +
+  Object.entries(mkCount).sort((a,b)=>b[1]-a[1])
+    .map(([m,c])=>`<option value="${esc(m)}">${esc(m)} (${nf(c)})</option>`).join("");
+document.getElementById("mk").onchange=e=>{mk=e.target.value; page=0; draw();};
 document.getElementById("q").oninput=e=>{q=e.target.value.trim().toLowerCase(); page=0; draw();};
 document.getElementById("pp").onchange=()=>{page=0; draw();};
 document.getElementById("prev").onclick=()=>{page--; draw(); scrollTo({top:document.querySelector(".tblwrap").offsetTop-70,behavior:"smooth"});};
@@ -314,18 +332,23 @@ document.getElementById("thm").onclick=()=>{
   const dark=cur? cur==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
   document.documentElement.setAttribute("data-theme", dark?"light":"dark");};
 document.getElementById("csv").onclick=()=>{
-  const h=["품번","발주","입고","CNT","전체평균가","전체최소가","전체최대가","발주단가","입고단가",
-           "원가하한","유효원가","원가상한","등급",`보수가(+${M[0]}%)`,`권장가(+${M[1]}%)`,`공격가(+${M[2]}%)`];
+  const h=["품번","부품명","메이커","발주","입고","CNT","전체평균가","전체최소가","전체최대가",
+           "발주단가","입고단가","원가하한","유효원가","원가상한","등급",
+           `보수가(+${M[0]}%)`,`권장가(+${M[1]}%)`,`공격가(+${M[2]}%)`];
+  const cq = v => { const s=v==null?"":String(v);
+    return /[",\r\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };   // 부품명에 쉼표가 있어도 안전
   const lines=[h.join(",")].concat(filtered().map(r=>{
     const c=r[I.유효원가], f=r[I.등급]==="F";
-    return [r[0],r[I.발주],r[I.입고],r[I.CNT],r[I.전체평균가],r[I.전체최소가],r[I.전체최대가],
+    return [r[0],r[I.부품명],r[I.메이커],r[I.발주],r[I.입고],r[I.CNT],
+            r[I.전체평균가],r[I.전체최소가],r[I.전체최대가],
             r[I.발주단가]??"",r[I.입고단가]??"",r[I.원가하한],f?"":c,r[I.원가상한],r[I.등급],
-            f?"":price(c,M[0]),f?"":price(c,M[1]),f?"":price(c,M[2])].join(",");}));
+            f?"":price(c,M[0]),f?"":price(c,M[1]),f?"":price(c,M[2])].map(cq).join(",");}));
   const blob=new Blob(["﻿"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
   a.download=`적정판매가_마진${M[1]}_${S.기준일}.csv`; a.click(); URL.revokeObjectURL(a.href);};
 document.getElementById("meta").textContent =
-  `기준 데이터: 발주·입고 집계 · 부품 ${nf(S.총부품수)}개 · 생성 ${S.기준일}`;
+  `기준 데이터: 발주·입고 집계 · 부품 ${nf(S.총부품수)}개 · 메이커 ${nf(S.메이커수)}개`
+  + (S.부품명결측 ? ` · 부품명 미기재 ${nf(S.부품명결측)}건` : "") + ` · 생성 ${S.기준일}`;
 tiles(); gchart(); draw();
 </script>
 </body>

@@ -2,8 +2,11 @@
 """
 재고 — 적정 판매가 산출 엔진
 ============================
-입력: *_발주_입고_횟수_*.xlsx  (품번, 발주, 입고, CNT, 발주평균가, 입고평균가, 전체평균가, 전체최소가, 전체최대가)
-출력: data.json  (웹 페이지용), 적정판매가_산출결과.xlsx
+입력: *_발주_입고_횟수_*.xlsx
+      필수 — 부품 품번, 발주, 입고, CNT, 발주평균가, 입고평균가, 전체평균가, 전체최소가, 전체최대가
+      선택 — 부품명, 메이커 (있으면 결과에 함께 싣는다)
+      컬럼은 헤더 이름으로 찾으므로 순서가 바뀌거나 추가돼도 동작한다.
+출력: index.html (페이지), data.json, 적정판매가_산출결과.xlsx
 
 핵심 전제 (데이터로 검증됨)
 ---------------------------
@@ -51,13 +54,42 @@ def grade_of(L, U, cnt, priced):
     return "D", "편차 심각 — 수동 확인 필수"
 
 
+def load(path):
+    """헤더 이름으로 컬럼을 찾는다 — 컬럼이 추가되거나 순서가 바뀌어도 동작한다."""
+    ws = openpyxl.load_workbook(path, data_only=True).worksheets[0]
+    hdr = [str(c.value).strip() if c.value is not None else "" for c in ws[1]]
+    need = ["부품 품번", "발주", "입고", "CNT", "발주평균가", "입고평균가",
+            "전체평균가", "전체최소가", "전체최대가"]
+    ix = {}
+    for k in need + ["부품명", "메이커"]:
+        ix[k] = hdr.index(k) if k in hdr else None
+    missing = [k for k in need if ix[k] is None]
+    if missing:
+        sys.exit(f"필수 컬럼 누락: {missing}\n  발견된 헤더: {hdr}")
+    return ix, list(ws.iter_rows(min_row=2, values_only=True))
+
+
+def txt(v):
+    """빈 문자열·공백·None 을 None 으로 정규화하고 앞뒤 공백을 제거한다."""
+    if v is None:
+        return None
+    s = str(v).strip()
+    return s or None
+
+
 def main():
-    wb = openpyxl.load_workbook(SRC, data_only=True)
-    rows = list(wb["Sheet1"].iter_rows(min_row=2, values_only=True))
+    ix, rows = load(SRC)
+    has_meta = ix["부품명"] is not None or ix["메이커"] is not None
 
     out = []
-    for pn, po, rc, cnt, pavg, ravg, avg, vmin, vmax in rows:
-        pn = str(pn).strip()
+    for row in rows:
+        g_ = lambda k: row[ix[k]]
+        pn = str(g_("부품 품번")).strip()
+        name = txt(row[ix["부품명"]]) if ix["부품명"] is not None else None
+        maker = txt(row[ix["메이커"]]) if ix["메이커"] is not None else None
+        po, rc, cnt = g_("발주"), g_("입고"), g_("CNT")
+        pavg, ravg, avg = g_("발주평균가"), g_("입고평균가"), g_("전체평균가")
+        vmin, vmax = g_("전체최소가"), g_("전체최대가")
         u_po = (pavg * cnt / po) if po > 0 else None      # 복원한 발주 단가
         u_rc = (ravg * cnt / rc) if rc > 0 else None      # 복원한 입고 단가
 
@@ -79,7 +111,8 @@ def main():
 
         g, note = grade_of(L, U, cnt, priced)
         rec = {
-            "품번": pn, "발주": po, "입고": rc, "CNT": cnt,
+            "품번": pn, "부품명": name, "메이커": maker,
+            "발주": po, "입고": rc, "CNT": cnt,
             "전체평균가": int(avg), "전체최소가": int(vmin), "전체최대가": int(vmax),
             "발주단가": int(round(u_po)) if u_po is not None else None,
             "입고단가": int(round(u_rc)) if u_rc is not None else None,
@@ -97,6 +130,7 @@ def main():
     gc = Counter(r["등급"] for r in out)
     ok = [r for r in out if r["등급"] != "F"]
     lift = [r["유효원가"] / r["전체평균가"] for r in ok if r["전체평균가"] > 0]
+    makers = Counter(r["메이커"] for r in out if r["메이커"])
     summary = {
         "총부품수": len(out),
         "산출가능": len(ok),
@@ -107,16 +141,20 @@ def main():
         "전체평균가_합계": sum(r["전체평균가"] for r in out),
         "권장가_합계": sum(r["권장가"] for r in out),
         "마진": MARGIN, "미기재비율_사전값": P0,
+        "메이커수": len(makers),
+        "메이커목록": [m for m, _ in makers.most_common()],
+        "부품명결측": sum(1 for r in out if not r["부품명"]),
     }
 
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump({"summary": summary, "items": out}, f, ensure_ascii=False, separators=(",", ":"))
 
     # ---- 웹 페이지 (데이터 내장, 단일 파일) ----
-    FIELDS = ["품번", "발주", "입고", "CNT", "전체평균가", "전체최소가", "전체최대가",
+    FIELDS = ["품번", "부품명", "메이커", "발주", "입고", "CNT",
+              "전체평균가", "전체최소가", "전체최대가",
               "발주단가", "입고단가", "원가하한", "유효원가", "원가상한", "등급"]
     web = {
-        "summary": {**summary, "기준일": "2026-08-11"},
+        "summary": {**summary, "기준일": "2026-08-12"},
         "items": [[r[k] for k in FIELDS] for r in out],
     }
     with open("template.html", encoding="utf-8") as f:
@@ -130,7 +168,8 @@ def main():
     wb2 = openpyxl.Workbook()
     ws = wb2.active
     ws.title = "적정판매가"
-    cols = ["품번", "발주", "입고", "CNT", "전체평균가", "전체최소가", "전체최대가",
+    cols = ["품번", "부품명", "메이커", "발주", "입고", "CNT",
+            "전체평균가", "전체최소가", "전체최대가",
             "발주단가", "입고단가", "미기재추정", "원가하한", "유효원가", "원가상한",
             "등급", "보수가", "권장가", "공격가", "비고"]
     ws.append(cols)
@@ -151,19 +190,22 @@ def main():
           % (summary["총부품수"], summary["산출가능"], summary["산출불가"]))
     print("등급분포:", summary["등급분포"])
     print("전체평균가 대비 유효원가 상향률 중앙값: %.1f%%" % ((summary["평균가대비_상향률_중앙값"] - 1) * 100))
-    print("원가총액  전체평균가 기준 %,d  ->  유효원가 기준 %,d".replace(",", "")
+    print("원가총액  전체평균가 기준 %d  ->  유효원가 기준 %d"
           % (summary["전체평균가_합계"], summary["유효원가_합계"]))
+    if has_meta:
+        print("메이커 %d개  |  부품명 결측 %d건" % (summary["메이커수"], summary["부품명결측"]))
     print("=" * 72)
     print("\n[검증] 발주1건 유가 + 입고1건 0원 유형 (진값 = 최대가 여야 함)")
     for r in out:
         if r["품번"] in ("51747255413", "5K0955978A", "5NA807568CYE4"):
-            print("  %-16s 평균가%9d  유효원가%9d  최대가%9d  등급%s  권장가%9d"
-                  % (r["품번"], r["전체평균가"], r["유효원가"], r["전체최대가"], r["등급"], r["권장가"]))
+            print("  %-16s %-14.14s 평균가%9d  유효원가%9d  최대가%9d  등급%s"
+                  % (r["품번"], r["부품명"] or "-", r["전체평균가"],
+                     r["유효원가"], r["전체최대가"], r["등급"]))
     print("\n[상위 CNT 부품]")
     for r in out[:8]:
-        print("  %-16s CNT%4d 평균가%8d 하한%8d 유효%8d 상한%8d [%s] 권장%9d"
-              % (r["품번"], r["CNT"], r["전체평균가"], r["원가하한"], r["유효원가"],
-                 r["원가상한"], r["등급"], r["권장가"]))
+        print("  %-16s %-4.4s %-16.16s CNT%4d 평균가%8d 유효%8d [%s] 권장%9d"
+              % (r["품번"], r["메이커"] or "-", r["부품명"] or "-", r["CNT"],
+                 r["전체평균가"], r["유효원가"], r["등급"], r["권장가"]))
 
 
 if __name__ == "__main__":
