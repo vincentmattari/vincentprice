@@ -164,6 +164,15 @@ def main():
     with open("index.html", "w", encoding="utf-8") as f:
         f.write(html)
 
+    # ---- 산출방법론.md -> 산출방법론.html ----
+    import render_md
+    with open("산출방법론.md", encoding="utf-8") as f:
+        body = render_md.render(f.read())
+    with open("template_method.html", encoding="utf-8") as f:
+        shell = f.read()
+    with open("산출방법론.html", "w", encoding="utf-8") as f:
+        f.write(shell.replace("<!--__CONTENT__-->", body))
+
     # ---- 엑셀 출력 ----
     wb2 = openpyxl.Workbook()
     ws = wb2.active

@@ -103,6 +103,8 @@ code{background:var(--plane);border:1px solid var(--ring);border-radius:4px;padd
 .warn{border-left:3px solid var(--g-d);background:color-mix(in srgb,var(--g-d) 8%,transparent);
   border-radius:6px;padding:11px 14px;margin:12px 0;font-size:13px;color:var(--ink-2)}
 .thm{position:absolute;top:20px;right:20px}
+.mlink{display:inline-block;margin-top:8px;color:var(--accent);font-weight:560;text-decoration:none}
+.mlink:hover{text-decoration:underline}
 @media(max-width:640px){.wrap{padding:20px 13px 60px}h1{font-size:21px}.tile .v{font-size:23px}}
 </style>
 </head>
@@ -113,7 +115,8 @@ code{background:var(--plane);border:1px solid var(--ring);border-radius:4px;padd
 <h1>재고 적정 판매가 산출</h1>
 <p class="sub">선입선출(FIFO)이 관리되지 않아 발주가·입고가를 그대로 신뢰할 수 없는 재고 데이터에서,
 <strong>가격 미기재(0원) 레코드를 보정</strong>해 부품별 유효원가와 판매가를 산출했습니다.
-마진율을 조정하면 표가 즉시 갱신됩니다.</p>
+마진율을 조정하면 표가 즉시 갱신됩니다.
+<a class="mlink" href="산출방법론.html">산출 방법론 자세히 보기 →</a></p>
 
 <div class="tiles" id="tiles"></div>
 
@@ -156,69 +159,6 @@ code{background:var(--plane);border:1px solid var(--ring);border-radius:4px;padd
     <span><button class="btn" id="prev" type="button">이전</button>
     <span id="pg" style="margin:0 10px"></span>
     <button class="btn" id="next" type="button">다음</button></span></div>
-</div>
-
-<div class="card">
-  <h2>산출 방법론</h2>
-
-  <details open><summary>1. 이 데이터의 근본 문제</summary>
-    <p>원본은 부품별 <strong>집계값</strong>만 담고 있습니다 — 발주/입고 횟수, 발주평균가, 입고평균가,
-    전체평균가·최소가·최대가. 개별 거래 내역이 없어 선입선출 원가를 역산할 수 없습니다.
-    그런데 데이터를 검증하면서 두 가지 구조적 결함을 확인했습니다.</p>
-    <p><strong>(가) 발주평균가·입고평균가는 '단가'가 아니다.</strong>
-    2,179행 <em>전부</em>에서 <code>발주평균가 + 입고평균가 = 전체평균가</code>가 성립합니다.
-    즉 두 값은 각자의 건수가 아니라 <strong>전체 건수(CNT)로 나눈 기여분</strong>입니다.
-    실제 단가를 보려면 되돌려야 합니다.</p>
-    <div class="eq">발주단가 = 발주평균가 × CNT ÷ 발주건수<br>입고단가 = 입고평균가 × CNT ÷ 입고건수</div>
-    <p><strong>(나) 0원은 '무료'가 아니라 '미기재'다.</strong>
-    이게 핵심입니다. CNT=2이고 최소가=0, 최대가&gt;0인 365개 부품 <em>전부</em>가
-    <code>전체평균가 = 전체최대가 ÷ 2</code>를 정확히 만족합니다.
-    한 건은 가격이 있고 다른 한 건은 0원이라 평균이 정확히 절반으로 희석된 것입니다.</p>
-    <div class="eq">51747255413 → 발주 1건 @ 127,200원 · 입고 1건 @ <strong>0원</strong><br>
-    전체평균가 63,600원 &nbsp;=&nbsp; 127,200 ÷ 2 &nbsp;← 실제 원가의 <strong>절반</strong></div>
-    <p>CNT=1인 부품 959개 중 410개(42.8%)가 가격 0원입니다. 즉 <strong>약 45%의 레코드에 가격이 기재되어 있지 않고</strong>,
-    이 0원들이 평균에 그대로 섞여 <strong>전체평균가를 구조적으로 끌어내리고 있습니다.</strong>
-    전체평균가를 그대로 원가로 쓰면 손해를 봅니다.</p>
-  </details>
-
-  <details><summary>2. 유효원가 산출 공식</summary>
-    <p>0 오염은 <strong>아래쪽으로만</strong> 작용합니다(가격을 낮추기만 함). 따라서 하한과 상한을 세우고 그 사이를 추정합니다.</p>
-    <div class="eq">원가하한 L = max(전체평균가, 발주단가, 입고단가)  ← 0 오염을 감안한 최선의 하한
-원가상한 U = 전체최대가                      ← 실제로 기재된 가장 높은 가격
-
-미기재추정 z = min( CNT × (1 − 전체평균가/U),   ← 데이터가 허용하는 최대치
-                   CNT × 0.45 )              ← 전사 미기재율 사전값
-
-유효원가 C = 전체평균가 × CNT ÷ (CNT − z),  단 [L, U] 범위로 제한</div>
-    <p>두 항 중 작은 쪽을 쓰는 이유는, 평균과 최대가의 차이가 <em>전부</em> 미기재 때문은 아니기 때문입니다.
-    거래 건수가 많은 부품은 실제 가격 변동(로트별 원가 차이)도 섞여 있어, 45% 사전값으로 상한을 걸어 과대 보정을 막습니다.</p>
-    <p><strong>검증:</strong> 진값을 아는 유형(발주 1건 유가 + 입고 1건 0원)에서 산출 결과가 정확히 최대가와 일치합니다.
-    위 51747255413의 유효원가는 <strong>127,200원</strong>으로 복원됩니다.</p>
-  </details>
-
-  <details><summary>3. 신뢰 등급의 의미</summary>
-    <p>등급은 <code>원가하한 ÷ 원가상한</code>, 즉 <strong>추정 구간이 얼마나 좁은지</strong>로 매깁니다. 구간이 좁을수록 확신이 큽니다.</p>
-    <ul>
-      <li><strong>A</strong> — 하한/상한 비율 ≥ 0.95. 가격이 일관돼 사실상 확정. 단, CNT=1이면 교차검증이 불가한 단일 관측입니다.</li>
-      <li><strong>B</strong> — ≥ 0.60. 편차가 경미해 그대로 사용 가능.</li>
-      <li><strong>C</strong> — ≥ 0.30. 편차가 커 검토 권장.</li>
-      <li><strong>D</strong> — &lt; 0.30. 편차 심각. 판매 전 수동 확인 필수.</li>
-      <li><strong>F</strong> — 전체최대가 = 0. 모든 거래에 가격이 없어 <strong>산출 불가</strong>. 이 파일만으로는 방법이 없습니다.</li>
-    </ul>
-    <div class="warn"><strong>C·D 등급과 F 등급은 일괄 적용 대상이 아닙니다.</strong>
-    C·D는 구간이 넓어 보수가 쪽을 쓰거나 실제 매입 단가를 확인해야 하고,
-    F는 외부 가격표(제조사 MSRP, 공급처 견적)를 붙이는 것 외에 방법이 없습니다.</div>
-  </details>
-
-  <details><summary>4. 한계 — 반드시 알아두실 점</summary>
-    <ul>
-      <li>원본에 <strong>거래 일자와 수량이 없습니다.</strong> 따라서 진짜 FIFO 원가는 계산할 수 없고, 최근 매입가 가중도 불가능합니다. 이 산출은 "시점 무관 대표원가"입니다.</li>
-      <li>미기재율 45%는 <strong>전사 단일값</strong>입니다. 부품별로 실제 미기재율이 다르면 개별 오차가 생깁니다.</li>
-      <li>전체최대가에 <strong>이상치</strong>(오타, 수량 묶음 입력)가 섞였다면 상한이 부풀려집니다. D등급 부품이 특히 의심 대상입니다.</li>
-      <li>마진율은 원가회수 기준일 뿐, <strong>시장 경쟁가·회전율·부품 희소성은 반영되어 있지 않습니다.</strong></li>
-      <li>근본 해결책은 <strong>입고 시 단가 필수 입력</strong>과 로트 단위 관리입니다. 이 산출은 그때까지의 보정책입니다.</li>
-    </ul>
-  </details>
 </div>
 
 <p class="foot muted" id="meta"></p>
