@@ -33,7 +33,11 @@
 body{margin:0;background:var(--plane);color:var(--ink-1);
   font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic",sans-serif;
   font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
-.wrap{max-width:1240px;margin:0 auto;padding:28px 20px 80px}
+/* 표가 16열이라 넓은 화면에서는 좌우 스크롤 없이 전부 보이도록 폭을 넓힌다.
+   좁은 화면에서는 자연히 줄어들고 .tblwrap 이 자체 스크롤로 받아준다. */
+.wrap{max-width:1900px;margin:0 auto;padding:28px 20px 80px}
+/* 읽기 좋은 폭 유지 — 본문·방법론은 넓어져도 한 줄이 길어지지 않게 */
+h1,.sub,.card>h2{max-width:80ch}
 h1{font-size:26px;line-height:1.25;margin:0 0 6px;letter-spacing:-.02em}
 h2{font-size:17px;margin:0 0 14px;letter-spacing:-.01em}
 .sub{color:var(--ink-2);margin:0 0 26px;max-width:70ch}
@@ -45,7 +49,7 @@ h2{font-size:17px;margin:0 0 14px;letter-spacing:-.01em}
 .tile .v{font-size:27px;font-weight:640;letter-spacing:-.02em;line-height:1.15}
 .tile .n{font-size:11.5px;color:var(--ink-3);margin-top:4px}
 /* grade chart — horizontal bars, labels in ink */
-.gchart{display:grid;grid-template-columns:auto 1fr auto;gap:9px 12px;align-items:center}
+.gchart{display:grid;grid-template-columns:auto 1fr auto;gap:9px 12px;align-items:center;max-width:780px}
 .gchart .gl{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-2);white-space:nowrap}
 .gchart .gl b{color:var(--ink-1);font-size:13px;width:12px;display:inline-block}
 .gtrack{background:var(--grid);border-radius:4px;height:20px;overflow:hidden}
@@ -72,14 +76,14 @@ input[type=range]{width:150px;accent-color:var(--accent)}
 /* table */
 .tblwrap{overflow-x:auto;border:1px solid var(--ring);border-radius:12px;background:var(--surface-1)}
 table{border-collapse:collapse;width:100%;font-size:13px}
-th,td{padding:8px 11px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--grid)}
+th,td{padding:7px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--grid)}
 th{position:sticky;top:0;background:var(--surface-1);color:var(--ink-2);font-size:11.5px;font-weight:620;
   text-align:right;cursor:pointer;user-select:none;z-index:2;box-shadow:inset 0 -1px var(--axis)}
 th:hover{color:var(--ink-1)}
 th.l,td.l{text-align:left}
 td{font-variant-numeric:tabular-nums;color:var(--ink-2)}
 td.pn{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--ink-1);font-size:12.5px}
-td.nm{color:var(--ink-1);max-width:230px;overflow:hidden;text-overflow:ellipsis}
+td.nm{color:var(--ink-1);max-width:200px;overflow:hidden;text-overflow:ellipsis}
 td.mkr{color:var(--ink-2);font-size:12px;letter-spacing:.02em}
 td.hero{color:var(--ink-1);font-weight:650}
 tbody tr:hover{background:color-mix(in srgb,var(--accent) 6%,transparent)}
