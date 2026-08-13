@@ -1,40 +1,93 @@
 /* ============================================================================
-   [1단계] 진단 쿼리 — 본 추출 전 확인용
+   [1단계] 진단 쿼리  —  SQL Server 2005/2008 호환
    ============================================================================
-   확인됨
-     srPrice = 1개당 단가 (INT)
-     R = 발주/출고 (수량 releaseEa),  S = 입고 (수량 storeEa)
-     재고 = SUM(storeEa) - SUM(releaseEa)
-     epmsPartStockStoreRelease = 발주(출고)/입고 내역
-     epmsPartStock             = 재고부품 기본정보
+   TRY_CONVERT / PERCENTILE_CONT / IIF / CONCAT / LAG 등 2012+ 함수는 쓰지 않는다.
    ============================================================================ */
 
-/* --- ★ (1) 재고가 음수인 로트가 있는가 -----------------------------------
-   잔여수량 = 입고 - 출고 가 음수면 재고 계산 전제가 깨진다.
-   초기 재고 이관, 반품, 로트 분할 등이 원인일 수 있다.                    */
-SELECT
-     CASE WHEN 잔여 < 0 THEN '음수 (문제)'
-          WHEN 잔여 = 0 THEN '0 (소진)'
-          ELSE '양수 (재고보유)' END AS 구분
-    ,COUNT(*)      AS 로트수
-    ,SUM(잔여)     AS 수량합
-FROM (
-    SELECT stockNo
-          ,ISNULL(SUM(storeEa),0) - ISNULL(SUM(releaseEa),0) AS 잔여
-    FROM epmsPartStockStoreRelease (NOLOCK)
-    GROUP BY stockNo
-) x
-GROUP BY CASE WHEN 잔여 < 0 THEN '음수 (문제)'
-              WHEN 잔여 = 0 THEN '0 (소진)'
-              ELSE '양수 (재고보유)' END;
+/* --- ★ (0) 버전 확인 — 어디까지 쓸 수 있는지 판단 ----------------------- */
+SELECT @@VERSION AS 버전
+      ,SERVERPROPERTY('ProductVersion')   AS 제품버전
+      ,SERVERPROPERTY('ProductLevel')     AS 서비스팩
+      ,(SELECT compatibility_level FROM sys.databases WHERE database_id = DB_ID()) AS 호환성수준;
 
 
-/* --- ★ (2) stockNo 당 입고 행이 1건인가 ----------------------------------
-   본 쿼리는 로트원가 = MAX(입고단가) 로 잡는다.
-   stockNo 당 입고가 여러 건이면 로트 개념이 달라지므로 확인이 필요하다.   */
+/* --- ★ (1) 컬럼 목록 — 발생사유·실입출고일·공급처의 실제 컬럼명 확인 ----
+   화면에 있는 항목들의 컬럼명을 알아야 쿼리에 넣을 수 있다.
+     발생사유   : 0원이 '무상'인지 '미기재'인지 구분하는 핵심
+     실입출고일 : 선입선출은 등록일이 아니라 이 날짜 기준이어야 정확
+     공급처     : 매입처별 단가 비교에 유용                                */
+SELECT c.column_id AS 순번, c.name AS 컬럼명, t.name AS 자료형
+      ,c.max_length AS 길이, c.is_nullable AS NULL허용
+FROM sys.columns c
+JOIN sys.types  t ON c.user_type_id = t.user_type_id
+WHERE c.object_id = OBJECT_ID('epmsPartStockStoreRelease')
+ORDER BY c.column_id;
+
+SELECT c.column_id AS 순번, c.name AS 컬럼명, t.name AS 자료형
+      ,c.max_length AS 길이, c.is_nullable AS NULL허용
+FROM sys.columns c
+JOIN sys.types  t ON c.user_type_id = t.user_type_id
+WHERE c.object_id = OBJECT_ID('epmsPartStock')
+ORDER BY c.column_id;
+
+
+/* --- ★ (2) 화면에서 본 두 부품의 원본 행 ---------------------------------
+   218823100C : 입고 55,000 -> 출고 0   (출고 단가 미기재)
+   1778810600 : 입고 0(한성에서 무료) -> 출고 0  (정당한 무상)
+   컬럼명 확인 후 발생사유가 어떻게 저장돼 있는지 눈으로 본다.            */
+SELECT EPSR.*
+FROM epmsPartStock (NOLOCK) AS EPS
+INNER JOIN epmsPartStockStoreRelease (NOLOCK) AS EPSR ON EPS.stockNo = EPSR.stockNo
+WHERE EPS.partNo IN ('218823100C', '1778810600')
+ORDER BY EPS.partNo, EPSR.stockNo;
+
+
+/* --- ★ (3) 0원 건의 발생사유 상위 목록 ------------------------------------
+   '무료', '무상', '서비스', '재고조사' 같은 말이 얼마나 자주 나오는지 본다.
+   ※ 아래 [발생사유] 를 (1)에서 확인한 실제 컬럼명으로 바꿔서 실행할 것     */
+/*
+SELECT TOP 50
+     srType
+    ,[발생사유]
+    ,COUNT(*) AS 건수
+FROM epmsPartStockStoreRelease (NOLOCK)
+WHERE ISNULL(srPrice,0) <= 0
+GROUP BY srType, [발생사유]
+ORDER BY COUNT(*) DESC;
+*/
+
+
+/* --- ★ (4) 수량 이상치 — 음수 수량이 어디에 있는가 ------------------------
+   N90855001 의 출고수량 -7 처럼 잘못 입력된 건을 찾는다.                  */
 SELECT
-     CAST(입고건수 AS VARCHAR(10)) + '건 입고' AS 구분
-    ,COUNT(*) AS stockNo수
+     EPS.partNo
+    ,EPSR.srType
+    ,EPSR.storeEa
+    ,EPSR.releaseEa
+    ,EPSR.srPrice
+    ,EPSR.regYmd
+FROM epmsPartStock (NOLOCK) AS EPS
+INNER JOIN epmsPartStockStoreRelease (NOLOCK) AS EPSR ON EPS.stockNo = EPSR.stockNo
+WHERE ISNULL(EPSR.storeEa,0) < 0 OR ISNULL(EPSR.releaseEa,0) < 0
+ORDER BY EPS.partNo;
+
+
+/* --- ★ (5) 재고 음수 로트 — 최소값은 0 이어야 한다 ------------------------ */
+SELECT
+     EPS.partNo
+    ,EPSR.stockNo
+    ,SUM(ISNULL(EPSR.storeEa,0))                                    AS 입고수량
+    ,SUM(ISNULL(EPSR.releaseEa,0))                                  AS 출고수량
+    ,SUM(ISNULL(EPSR.storeEa,0)) - SUM(ISNULL(EPSR.releaseEa,0))    AS 잔여수량
+FROM epmsPartStock (NOLOCK) AS EPS
+INNER JOIN epmsPartStockStoreRelease (NOLOCK) AS EPSR ON EPS.stockNo = EPSR.stockNo
+GROUP BY EPS.partNo, EPSR.stockNo
+HAVING SUM(ISNULL(EPSR.storeEa,0)) - SUM(ISNULL(EPSR.releaseEa,0)) < 0
+ORDER BY SUM(ISNULL(EPSR.storeEa,0)) - SUM(ISNULL(EPSR.releaseEa,0));
+
+
+/* --- (6) stockNo 당 입고 행 수 — 로트 개념 검증 --------------------------- */
+SELECT 입고건수, COUNT(*) AS stockNo수
 FROM (
     SELECT stockNo, SUM(CASE WHEN srType='S' THEN 1 ELSE 0 END) AS 입고건수
     FROM epmsPartStockStoreRelease (NOLOCK)
@@ -44,65 +97,49 @@ GROUP BY 입고건수
 ORDER BY COUNT(*) DESC;
 
 
-/* --- ★ (3) 시간 순서 — 입고가 출고보다 먼저인가 --------------------------
-   로트 개념이 맞다면 입고일 <= 첫 출고일 이어야 한다.                     */
-SELECT
-     CASE WHEN 입고일 IS NULL THEN '입고없음 (문제)'
-          WHEN 출고일 IS NULL THEN '출고없음 (미사용 재고)'
-          WHEN 입고일 <= 출고일 THEN '입고 -> 출고 (정상)'
-          ELSE '출고 -> 입고 (역순)' END AS 순서
-    ,COUNT(*) AS 로트수
-FROM (
-    SELECT stockNo
-          ,MIN(CASE WHEN srType='S' THEN TRY_CONVERT(DATE, CONVERT(VARCHAR(8), regYmd,112)) END) AS 입고일
-          ,MIN(CASE WHEN srType='R' THEN TRY_CONVERT(DATE, CONVERT(VARCHAR(8), regYmd,112)) END) AS 출고일
-    FROM epmsPartStockStoreRelease (NOLOCK)
-    GROUP BY stockNo
-) x
-GROUP BY CASE WHEN 입고일 IS NULL THEN '입고없음 (문제)'
-              WHEN 출고일 IS NULL THEN '출고없음 (미사용 재고)'
-              WHEN 입고일 <= 출고일 THEN '입고 -> 출고 (정상)'
-              ELSE '출고 -> 입고 (역순)' END;
-
-
-/* --- ★ (4) 0원(미기재)이 입고/출고 중 어디서 발생하는가 ------------------
-   입고쪽 0원 = 원가 미기재 (원가 산출에 지장)
-   출고쪽 0원 = 판매가 미기재 (무상 교체·보증 건일 수도 있다)              */
+/* --- (7) 0원 발생 지점 — 입고(원가) vs 출고(판매가) ----------------------- */
 SELECT
      srType
-    ,CASE srType WHEN 'S' THEN '입고(원가)' WHEN 'R' THEN '발주/출고(판매가)' ELSE '기타' END AS 구분
-    ,COUNT(*)                                                    AS 건수
-    ,SUM(CASE WHEN ISNULL(srPrice,0) <= 0 THEN 1 ELSE 0 END)     AS 가격0건수
+    ,CASE srType WHEN 'S' THEN '입고(원가)'
+                 WHEN 'R' THEN '발주/출고(판매가)' ELSE '기타' END   AS 구분
+    ,COUNT(*)                                                       AS 건수
+    ,SUM(CASE WHEN ISNULL(srPrice,0) <= 0 THEN 1 ELSE 0 END)        AS 가격0건수
     ,CAST(100.0 * SUM(CASE WHEN ISNULL(srPrice,0) <= 0 THEN 1 ELSE 0 END)
-          / NULLIF(COUNT(*),0) AS DECIMAL(5,1))                  AS 가격0비율
-    ,AVG(CAST(NULLIF(srPrice,0) AS DECIMAL(18,2)))               AS 유효평균단가
-    ,SUM(CAST(ISNULL(storeEa,0)   AS BIGINT))                    AS 입고수량합
-    ,SUM(CAST(ISNULL(releaseEa,0) AS BIGINT))                    AS 출고수량합
+          / COUNT(*) AS DECIMAL(5,1))                               AS 가격0비율
+    ,AVG(CAST(NULLIF(srPrice,0) AS DECIMAL(18,2)))                  AS 유효평균단가
 FROM epmsPartStockStoreRelease (NOLOCK)
 GROUP BY srType;
 
 
-/* --- (5) 실현 마진 감 잡기 — 출고단가가 입고단가보다 얼마나 높은가 ------
-   이 값이 그동안 실제로 적용해온 마진이다.                               */
-SELECT TOP 20
-     EPS.partNo
-    ,AVG(CAST(CASE WHEN srType='S' THEN NULLIF(srPrice,0) END AS DECIMAL(18,2))) AS 평균원가
-    ,AVG(CAST(CASE WHEN srType='R' THEN NULLIF(srPrice,0) END AS DECIMAL(18,2))) AS 평균판매가
-    ,CAST(AVG(CAST(CASE WHEN srType='R' THEN NULLIF(srPrice,0) END AS DECIMAL(18,2)))
-        / NULLIF(AVG(CAST(CASE WHEN srType='S' THEN NULLIF(srPrice,0) END AS DECIMAL(18,2))),0)
-        AS DECIMAL(10,3)) AS 마진배수
-    ,COUNT(*) AS 건수
-FROM epmsPartStock (NOLOCK) AS EPS
-INNER JOIN epmsPartStockStoreRelease (NOLOCK) AS EPSR ON EPS.stockNo = EPSR.stockNo
-GROUP BY EPS.partNo
-HAVING AVG(CAST(CASE WHEN srType='S' THEN NULLIF(srPrice,0) END AS DECIMAL(18,2))) > 0
-   AND AVG(CAST(CASE WHEN srType='R' THEN NULLIF(srPrice,0) END AS DECIMAL(18,2))) > 0
+/* --- ★ (8) 0원 성격 판별 — 로트 단위 교차 확인 ---------------------------
+   입고 0 인데 출고가 유가 -> 팔았으니 무상일 리 없다 = 원가 미기재
+   입고 유가인데 출고 0     -> 판매가 미기재 (스크린샷 218823100C 유형)
+   입고 0 이고 출고도 0     -> 무상 추정 (스크린샷 1778810600 유형)        */
+SELECT
+     CASE WHEN 입고단가 > 0 AND 출고최대단가 > 0 THEN '1) 양쪽 유가 (정상)'
+          WHEN 입고단가 > 0 AND ISNULL(출고최대단가,0) = 0 AND 출고건수 > 0
+               THEN '2) 입고 유가 / 출고 0  -> 판매가 미기재'
+          WHEN ISNULL(입고단가,0) = 0 AND 출고최대단가 > 0
+               THEN '3) 입고 0 / 출고 유가  -> 원가 미기재'
+          WHEN ISNULL(입고단가,0) = 0 AND ISNULL(출고최대단가,0) = 0
+               THEN '4) 양쪽 0  -> 무상 추정'
+          ELSE '5) 기타' END                                        AS 유형
+    ,COUNT(*) AS 로트수
+FROM (
+    SELECT stockNo
+          ,MAX(CASE WHEN srType='S' THEN srPrice END)   AS 입고단가
+          ,MAX(CASE WHEN srType='R' THEN srPrice END)   AS 출고최대단가
+          ,SUM(CASE WHEN srType='R' THEN 1 ELSE 0 END)  AS 출고건수
+    FROM epmsPartStockStoreRelease (NOLOCK)
+    GROUP BY stockNo
+) x
+GROUP BY
+     CASE WHEN 입고단가 > 0 AND 출고최대단가 > 0 THEN '1) 양쪽 유가 (정상)'
+          WHEN 입고단가 > 0 AND ISNULL(출고최대단가,0) = 0 AND 출고건수 > 0
+               THEN '2) 입고 유가 / 출고 0  -> 판매가 미기재'
+          WHEN ISNULL(입고단가,0) = 0 AND 출고최대단가 > 0
+               THEN '3) 입고 0 / 출고 유가  -> 원가 미기재'
+          WHEN ISNULL(입고단가,0) = 0 AND ISNULL(출고최대단가,0) = 0
+               THEN '4) 양쪽 0  -> 무상 추정'
+          ELSE '5) 기타' END
 ORDER BY COUNT(*) DESC;
-
-
-/* --- (6) epmsPartStock 의 컬럼 — 재고/상태 컬럼이 이미 있는지 ----------- */
-SELECT c.name AS 컬럼명, t.name AS 자료형, c.max_length, c.is_nullable
-FROM sys.columns c
-JOIN sys.types  t ON c.user_type_id = t.user_type_id
-WHERE c.object_id = OBJECT_ID('epmsPartStock')
-ORDER BY c.column_id;
