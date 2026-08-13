@@ -3,7 +3,7 @@
 산출방법론.md -> 산출방법론.html
 ================================
 문서에서 실제로 쓰는 문법만 처리하는 소형 렌더러다.
-지원: 제목(#~###), 문단, 코드블록(```), 표, 목록(-), 인용(>), 수평선(---),
+지원: 제목(#~####), 문단, 코드블록(```), 표, 목록(-), 인용(>), 수평선(---),
       인라인 **굵게** · `코드`
 """
 import html as H
@@ -46,7 +46,7 @@ def render(md):
             continue
 
         # 제목
-        m = re.match(r"^(#{1,3})\s+(.*)$", ln)
+        m = re.match(r"^(#{1,4})\s+(.*)$", ln)
         if m:
             lv = len(m.group(1))
             out.append(f"<h{lv}>{inline(m.group(2))}</h{lv}>")
@@ -103,7 +103,7 @@ def render(md):
         # 문단 — 빈 줄까지 이어붙인다
         buf = []
         while i < len(lines) and lines[i].strip() and not re.match(
-                r"^(#{1,3}\s|```|>|[-*]\s|\s*\|)", lines[i]) and lines[i].strip() != "---":
+                r"^(#{1,4}\s|```|>|[-*]\s|\s*\|)", lines[i]) and lines[i].strip() != "---":
             buf.append(lines[i].strip())
             i += 1
         if buf:

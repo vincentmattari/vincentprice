@@ -16,12 +16,21 @@ SRC = _found[-1]
 
 _ws = openpyxl.load_workbook(SRC, data_only=True).worksheets[0]
 _hdr = [str(c.value).strip() if c.value is not None else "" for c in _ws[1]]
+_ALIAS = {
+    "부품 품번": ["부품 품번", "부품품번", "품번"],
+    "CNT":      ["CNT", "발주/입고 합계", "발주/입고합계", "합계"],
+}
 _need = ["부품 품번", "발주", "입고", "CNT", "발주평균가", "입고평균가",
          "전체평균가", "전체최소가", "전체최대가"]
-_missing = [k for k in _need if k not in _hdr]
+_ix = []                                 # 헤더 이름으로 찾아 컬럼 순서·명칭 변화에 견딘다
+_missing = []
+for _k in _need:
+    _j = next((_hdr.index(a) for a in _ALIAS.get(_k, [_k]) if a in _hdr), None)
+    if _j is None:
+        _missing.append(_k)
+    _ix.append(_j)
 if _missing:
     sys.exit(f"필수 컬럼 누락: {_missing}\n  발견된 헤더: {_hdr}")
-_ix = [_hdr.index(k) for k in _need]     # 헤더 이름으로 찾아 컬럼 순서 변화에 견딘다
 rows = [tuple(r[i] for i in _ix) for r in _ws.iter_rows(min_row=2, values_only=True)]
 print(f"원본: {SRC}\n행수: {len(rows)}\n")
 ok = True

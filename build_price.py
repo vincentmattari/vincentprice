@@ -58,11 +58,18 @@ def load(path):
     """헤더 이름으로 컬럼을 찾는다 — 컬럼이 추가되거나 순서가 바뀌어도 동작한다."""
     ws = openpyxl.load_workbook(path, data_only=True).worksheets[0]
     hdr = [str(c.value).strip() if c.value is not None else "" for c in ws[1]]
+    # 같은 뜻으로 쓰이는 헤더명들 — 첫 번째로 발견되는 것을 쓴다
+    ALIAS = {
+        "부품 품번": ["부품 품번", "부품품번", "품번"],
+        "CNT":      ["CNT", "발주/입고 합계", "발주/입고합계", "합계"],
+        "부품명":    ["부품명", "품명"],
+        "메이커":    ["메이커", "제조사"],
+    }
     need = ["부품 품번", "발주", "입고", "CNT", "발주평균가", "입고평균가",
             "전체평균가", "전체최소가", "전체최대가"]
     ix = {}
     for k in need + ["부품명", "메이커"]:
-        ix[k] = hdr.index(k) if k in hdr else None
+        ix[k] = next((hdr.index(a) for a in ALIAS.get(k, [k]) if a in hdr), None)
     missing = [k for k in need if ix[k] is None]
     if missing:
         sys.exit(f"필수 컬럼 누락: {missing}\n  발견된 헤더: {hdr}")

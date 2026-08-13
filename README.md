@@ -123,6 +123,7 @@ python build_price.py          # index.html · data.json · 적정판매가_산�
 | 파일 | 설명 |
 |---|---|
 | `verify_assumptions.py` | 두 전제를 원본 데이터로 검증 |
+| `test_hypothesis.py` | 발주평균가·입고평균가의 정의를 데이터로 판별 (복원식 근거) |
 | `build_price.py` | 산출 엔진 — 원가 추정, 등급 판정, 산출물 생성 |
 | `render_md.py` | 방법론 문서 마크다운 → HTML 렌더러 |
 | `template.html` | 결과 페이지 템플릿 (데이터 주입 전) |
