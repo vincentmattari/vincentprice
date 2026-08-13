@@ -11,7 +11,7 @@
      srPrice   int           1개당 단가 (0 = 미기재 또는 무상)
      srDesc    nvarchar(2000) 발생사유  <- '한성에서 무료' 처럼 무상 여부가 적힌다
      srRealYmd smalldatetime 실입출고일 <- 선입선출 기준일. 등록일(regYmd) 아님
-     stockNo   int           재고 로트
+     stockNo   int           부품별 재고 등록 단위 (매입 로트가 아님)
 
    ※ 사용하지 않기로 확인된 컬럼
      supplyCompanyNo (공급처) — 대부분 미입력
@@ -20,13 +20,19 @@
        따라서 입고 단가가 없는 부품은 이 데이터만으로 원가를 알 수 없고,
        외부 가격표(제조사 MSRP, 공급처 견적)를 붙이는 수밖에 없다.
 
+   ※ stockNo 는 '로트'가 아니다
+     stockNo 약 2,183개 vs 부품(품번+메이커) 2,180개로 사실상 1:1 이다.
+     즉 매입 로트가 아니라 '부품별 재고 등록 단위'다.
+     따라서 이 쿼리로는 선입선출 원가를 구할 수 없고, 나오는 값은
+     해당 부품 입고분 전체의 '이동평균원가'다. 정당한 원가법이지만 FIFO 는 아니다.
+     진짜 선입선출이 필요하면 query_2_행단위.sql 로 행을 뽑아 날짜순 재생해야 한다.
+
    설계
-     1) 로트(stockNo) 단위로 잔여수량 = 입고 - 출고
+     1) stockNo 단위로 잔여수량 = 입고 - 출고
         stockNo 의 85%가 입고 1건이지만 15%는 여러 건이므로
-        로트원가는 MAX 가 아니라 '수량가중 평균'으로 구한다.
-     2) 보유재고 단위원가 = SUM(잔여수량 x 로트원가) / SUM(잔여수량)
-        전체 기간 평균이 아니라 지금 들고 있는 재고의 원가다.
-        원래 문제였던 '선입선출 미관리'를 정면으로 푼다.
+        단위원가는 MAX 가 아니라 '수량가중 평균'으로 구한다.
+     2) 보유재고 이동평균원가 = SUM(잔여수량 x 단위원가) / SUM(잔여수량)
+        전체 기간 단순평균이 아니라 수량을 반영한 값이다.
      3) 0원은 srDesc 로 무상/미기재를 갈라낸다.
         무상이면 원가 0 이 맞고, 미기재면 원가 계산에서 빼야 한다.
      4) 음수 수량 3건(C2C3563 -3, N90855001 -7, NQ0810.. -1)은 오입력이므로
@@ -56,20 +62,20 @@
     INNER JOIN epmsPartStockStoreRelease (NOLOCK) AS EPSR
             ON EPS.stockNo = EPSR.stockNo
 ),
-/* ---- 로트(stockNo) 단위 ---- */
+/* ---- 재고단위(stockNo) 집계 ---- */
 lot AS (
     SELECT
          stockNo, partNo, maker
-        ,SUM(입고수량)                                       AS 로트입고수량
-        ,SUM(출고수량)                                       AS 로트출고수량
+        ,SUM(입고수량)                                       AS 입고수량계
+        ,SUM(출고수량)                                       AS 출고수량계
         ,SUM(입고수량) - SUM(출고수량)                        AS 잔여수량
-        /* 로트원가 = 그 로트 입고분의 수량가중 평균단가 (0원 건 제외) */
+        /* 단위원가 = 해당 재고단위 입고분의 수량가중 평균단가 (0원 건 제외) */
         ,SUM(CASE WHEN srType='S' AND 단가 IS NOT NULL
                   THEN CAST(단가 AS DECIMAL(18,2)) * 입고수량 END)
          / NULLIF(SUM(CASE WHEN srType='S' AND 단가 IS NOT NULL
-                           THEN 입고수량 END), 0)              AS 로트원가
-        ,MAX(CASE WHEN srType='R' THEN 단가 END)             AS 로트최대판매가
-        ,SUM(CASE WHEN srType='R' THEN 1 ELSE 0 END)         AS 로트출고건수
+                           THEN 입고수량 END), 0)              AS 단위원가
+        ,MAX(CASE WHEN srType='R' THEN 단가 END)             AS 최대판매가
+        ,SUM(CASE WHEN srType='R' THEN 1 ELSE 0 END)         AS 출고건수계
         ,MAX(CASE WHEN srType='S' THEN 무상표기 ELSE 0 END)   AS 입고무상표기
         ,MIN(CASE WHEN srType='S' THEN dt END)               AS 입고일
         ,MAX(수량이상)                                        AS 수량이상
@@ -120,32 +126,32 @@ SELECT
     ,CASE WHEN SUM(CAST(l.잔여수량 AS BIGINT)) < 0 THEN 0
           ELSE SUM(CAST(l.잔여수량 AS BIGINT)) END                   AS [현재고수량]
     ,CASE WHEN SUM(CAST(l.잔여수량 AS BIGINT)) > 0 THEN 'Y' ELSE 'N' END AS [재고보유]
-    ,SUM(CAST(l.로트입고수량 AS BIGINT))                             AS [총입고수량]
-    ,SUM(CAST(l.로트출고수량 AS BIGINT))                             AS [총출고수량]
-    ,COUNT(*)                                                       AS [로트수]
-    ,SUM(CASE WHEN l.잔여수량 > 0 THEN 1 ELSE 0 END)                 AS [잔여로트수]
+    ,SUM(CAST(l.입고수량계 AS BIGINT))                             AS [총입고수량]
+    ,SUM(CAST(l.출고수량계 AS BIGINT))                             AS [총출고수량]
+    ,COUNT(*)                                                       AS [재고단위수]
+    ,SUM(CASE WHEN l.잔여수량 > 0 THEN 1 ELSE 0 END)                 AS [잔여재고단위수]
     ,MAX(l.수량이상)                                                 AS [수량이상_검토]
 
-    /* ---------- ★ 선입선출 — 지금 보유한 재고의 원가 ---------- */
-    ,SUM(CASE WHEN l.잔여수량 > 0 AND l.로트원가 IS NOT NULL
-              THEN l.로트원가 * l.잔여수량 END)                       AS [보유재고_평가액]
-    ,SUM(CASE WHEN l.잔여수량 > 0 AND l.로트원가 IS NOT NULL
+    /* ---------- 보유 재고의 원가 (이동평균. FIFO 아님 — query_2 참조) ---------- */
+    ,SUM(CASE WHEN l.잔여수량 > 0 AND l.단위원가 IS NOT NULL
+              THEN l.단위원가 * l.잔여수량 END)                       AS [보유재고_평가액]
+    ,SUM(CASE WHEN l.잔여수량 > 0 AND l.단위원가 IS NOT NULL
               THEN l.잔여수량 END)                                    AS [보유재고_원가확인수량]
-    ,CAST(SUM(CASE WHEN l.잔여수량 > 0 AND l.로트원가 IS NOT NULL
-                   THEN l.로트원가 * l.잔여수량 END)
-      / NULLIF(SUM(CASE WHEN l.잔여수량 > 0 AND l.로트원가 IS NOT NULL
-                        THEN l.잔여수량 END), 0) AS DECIMAL(18,2))    AS [보유재고_단위원가]
+    ,CAST(SUM(CASE WHEN l.잔여수량 > 0 AND l.단위원가 IS NOT NULL
+                   THEN l.단위원가 * l.잔여수량 END)
+      / NULLIF(SUM(CASE WHEN l.잔여수량 > 0 AND l.단위원가 IS NOT NULL
+                        THEN l.잔여수량 END), 0) AS DECIMAL(18,2))    AS [보유재고_이동평균원가]
     ,CONVERT(VARCHAR(10), MAX(CASE WHEN l.잔여수량 > 0 THEN l.입고일 END), 23)
                                                                     AS [보유재고_최종입고일]
 
-    /* ---------- 0원의 성격 (로트 단위) ---------- */
-    ,SUM(CASE WHEN l.로트원가 IS NOT NULL THEN 1 ELSE 0 END)         AS [원가확정_로트]
-    ,SUM(CASE WHEN l.로트원가 IS NULL AND l.입고무상표기 = 1
-              THEN 1 ELSE 0 END)                                    AS [무상확정_로트]   /* 사유에 무료/무상 명시 */
-    ,SUM(CASE WHEN l.로트원가 IS NULL AND l.입고무상표기 = 0
-                   AND l.로트최대판매가 IS NOT NULL THEN 1 ELSE 0 END) AS [원가미기재_로트] /* 팔았으니 무상 아님 */
-    ,SUM(CASE WHEN l.로트원가 IS NULL AND l.입고무상표기 = 0
-                   AND l.로트최대판매가 IS NULL THEN 1 ELSE 0 END)     AS [원가미상_로트]
+    /* ---------- 0원의 성격 (재고단위 기준) ---------- */
+    ,SUM(CASE WHEN l.단위원가 IS NOT NULL THEN 1 ELSE 0 END)         AS [원가확정_건]
+    ,SUM(CASE WHEN l.단위원가 IS NULL AND l.입고무상표기 = 1
+              THEN 1 ELSE 0 END)                                    AS [무상확정_건]   /* 사유에 무료/무상 명시 */
+    ,SUM(CASE WHEN l.단위원가 IS NULL AND l.입고무상표기 = 0
+                   AND l.최대판매가 IS NOT NULL THEN 1 ELSE 0 END) AS [원가미기재_건] /* 팔았으니 무상 아님 */
+    ,SUM(CASE WHEN l.단위원가 IS NULL AND l.입고무상표기 = 0
+                   AND l.최대판매가 IS NULL THEN 1 ELSE 0 END)     AS [원가미상_건]
 
     /* ---------- 매입 원가 ---------- */
     ,MAX(b.입고건수)                                                AS [입고건수]
