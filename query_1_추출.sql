@@ -13,7 +13,12 @@
      srRealYmd smalldatetime 실입출고일 <- 선입선출 기준일. 등록일(regYmd) 아님
      stockNo   int           재고 로트
 
-   ※ supplyCompanyNo(공급처) 는 대부분 미입력이라 사용하지 않는다.
+   ※ 사용하지 않기로 확인된 컬럼
+     supplyCompanyNo (공급처) — 대부분 미입력
+     epmsPartStock 의 optimumEa / prevCenterPrice / centerPrice / purchasePrice
+       — 대부분 0 이라 대체 가격원으로 쓸 수 없다.
+       따라서 입고 단가가 없는 부품은 이 데이터만으로 원가를 알 수 없고,
+       외부 가격표(제조사 MSRP, 공급처 견적)를 붙이는 수밖에 없다.
 
    설계
      1) 로트(stockNo) 단위로 잔여수량 = 입고 - 출고
