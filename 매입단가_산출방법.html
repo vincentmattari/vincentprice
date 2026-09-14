@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>매입단가 산출 방법</title>
+<style>
+:root{
+  color-scheme: light;
+  --surface-1:#fcfcfb; --plane:#f9f9f7;
+  --ink-1:#0b0b0b; --ink-2:#52514e; --ink-3:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
+  --accent:#2a78d6; --warn:#d03b3b;
+}
+@media (prefers-color-scheme: dark){:root:where(:not([data-theme="light"])){
+  color-scheme: dark;
+  --surface-1:#1a1a19; --plane:#0d0d0d;
+  --ink-1:#fff; --ink-2:#c3c2b7; --ink-3:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --accent:#3987e5; --warn:#d03b3b;
+}}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --surface-1:#1a1a19; --plane:#0d0d0d;
+  --ink-1:#fff; --ink-2:#c3c2b7; --ink-3:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --accent:#3987e5; --warn:#d03b3b;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink-1);
+  font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic",sans-serif;
+  font-size:15px;line-height:1.72;-webkit-font-smoothing:antialiased}
+.wrap{max-width:860px;margin:0 auto;padding:28px 20px 90px;position:relative}
+.nav{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  flex-wrap:wrap;margin-bottom:26px}
+.btn{border:1px solid var(--axis);background:var(--surface-1);color:var(--ink-1);
+  border-radius:7px;padding:8px 14px;font:inherit;font-size:13px;font-weight:560;
+  cursor:pointer;text-decoration:none;display:inline-block}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+h1{font-size:29px;line-height:1.25;margin:0 0 8px;letter-spacing:-.022em}
+h2{font-size:21px;margin:44px 0 12px;letter-spacing:-.015em;padding-top:6px}
+h3{font-size:16.5px;margin:30px 0 8px;letter-spacing:-.01em;color:var(--ink-1)}
+h4{font-size:14.5px;margin:26px 0 8px;color:var(--ink-1);
+  padding-left:11px;border-left:3px solid var(--accent)}
+p{margin:0 0 14px;color:var(--ink-2)}
+strong{color:var(--ink-1);font-weight:640}
+hr{border:0;border-top:1px solid var(--grid);margin:34px 0}
+ul{margin:0 0 16px;padding-left:22px;color:var(--ink-2)}
+li{margin-bottom:7px}
+code{background:var(--surface-1);border:1px solid var(--ring);border-radius:4px;
+  padding:1.5px 5px;font-family:ui-monospace,Consolas,monospace;font-size:13px;color:var(--ink-1)}
+pre.eq{background:var(--surface-1);border:1px solid var(--ring);
+  border-left:3px solid var(--accent);border-radius:7px;padding:14px 16px;margin:16px 0;
+  font-family:ui-monospace,Consolas,monospace;font-size:13px;line-height:1.65;
+  overflow-x:auto;color:var(--ink-1);white-space:pre}
+blockquote.warn{border:0;border-left:3px solid var(--warn);
+  background:color-mix(in srgb,var(--warn) 8%,transparent);
+  border-radius:7px;padding:13px 16px;margin:18px 0;color:var(--ink-2)}
+blockquote.warn strong{color:var(--ink-1)}
+.tblwrap{overflow-x:auto;border:1px solid var(--ring);border-radius:9px;
+  background:var(--surface-1);margin:16px 0}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:9px 13px;text-align:left;border-bottom:1px solid var(--grid);
+  color:var(--ink-2);white-space:nowrap}
+th{background:var(--surface-1);color:var(--ink-1);font-size:12px;font-weight:640;
+  box-shadow:inset 0 -1px var(--axis)}
+tbody tr:last-child td{border-bottom:0}
+td:not(:first-child){font-variant-numeric:tabular-nums}
+.foot{margin-top:50px;padding-top:18px;border-top:1px solid var(--grid);
+  font-size:13px;color:var(--ink-3)}
+.foot a{color:var(--accent)}
+@media(max-width:640px){.wrap{padding:20px 14px 60px}h1{font-size:23px}h2{font-size:18.5px}body{font-size:14.5px}}
+@media print{
+  .nav{display:none}
+  body{background:#fff;font-size:11pt}
+  .wrap{max-width:100%;padding:0}
+  h2{page-break-after:avoid}
+  table,pre.eq,blockquote.warn{page-break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="nav">
+    <a class="btn" href="index.html">← 산출 결과로 돌아가기</a>
+    <button class="btn" id="thm" type="button">◐ 테마</button>
+  </div>
+<h1>매입단가 산출 방법</h1>
+<p>재고가 있는 부품의 매입단가를 확정하는 방법을 정리합니다. 확정된 단가는 주문 기준가로 사용하고, DB에 일괄 반영해 선입선출 관리의 출발점으로 삼습니다.</p>
+<p><strong>기준일</strong> 2026-08-31 · <strong>대상</strong> 성수 2,183개 + 광주 1,127개 = 부품 3,310개 (이동내역 8,990건)</p>
+<blockquote class="warn"><strong>지점은 절대 합치지 않습니다.</strong> 성수와 광주는 서로 다른 DB이고 재고도 별개입니다. 재고번호(<code>stockNo</code>)마저 지점별로 따로 채번되어 <strong>658개가 겹치는데 그 전부가 서로 다른 부품</strong>입니다 (예: <code>1135</code> = 성수 BMW 51717064092 / 광주 MB 2044906427). 따라서 선입선출 재생도, 등급 판정도, 매입단가도 <strong>지점별로 따로</strong> 산출합니다. 양 지점에 같은 품번이 있는 경우가 재고 보유 기준 11개 있는데, 이들도 각각 별개 행입니다. 통합 페이지는 두 지점의 결과를 <strong>나란히 보여줄 뿐 섞지 않습니다.</strong></blockquote>
+<hr>
+<h2>1. 왜 기존 값을 그대로 쓸 수 없었나</h2>
+<h3>(1) 평균가 컬럼이 실제 단가가 아니었다</h3>
+<p>기존 추출 쿼리의 구문이 문제였습니다.</p>
+<pre class="eq">AVG(CASE WHEN srType = &#x27;R&#x27; THEN srPrice ELSE 0 END)</pre>
+<p><code>AVG</code>는 <strong>그룹의 전체 행 수로 나눕니다.</strong> <code>ELSE 0</code>이 해당하지 않는 행을 0으로 채우면 분자에는 기여하지 않으면서 분모에는 포함되므로, 결과는 그 구분의 단가가 아니라 <strong>전체 건수로 나눈 기여분</strong>이 됩니다.</p>
+<p>2,180행 <strong>전부</strong>에서 <code>발주평균가 + 입고평균가 = 전체평균가</code>가 성립하는 것이 그 증거입니다. 각자의 건수로 나눈 평균이라면 이런 관계가 나올 수 없습니다.</p>
+<pre class="eq">발주단가 = 발주평균가 × 전체건수 ÷ 발주건수    ← 되돌리는 식</pre>
+<p><code>ELSE</code>를 빼면 <code>NULL</code>이 되고 <code>AVG</code>가 <code>NULL</code>을 무시하므로 처음부터 올바른 평균이 나옵니다.</p>
+<h3>(2) 0원은 &#x27;무료&#x27;가 아니라 &#x27;단가 미입력&#x27;</h3>
+<p>전체 거래의 약 40%가 단가 0원입니다.</p>
+<div class='tblwrap'><table><thead><tr><th>구분</th><th>건수</th><th>0원 건수</th><th>0원 비율</th></tr></thead><tbody><tr><td>입고 (원가)</td><td>2,850</td><td>1,205</td><td>42.3%</td></tr><tr><td>발주/출고 (판매가)</td><td>3,895</td><td>1,512</td><td>38.8%</td></tr></tbody></table></div>
+<p>이 0원들이 평균에 섞여 <strong>원가가 구조적으로 과소평가</strong>되고 있었습니다. 단일거래 부품 959개 중 410개(42.8%)가 0원이고, 거래 2건 중 1건이 0원인 부품 365개 <strong>전부</strong>가 <code>전체평균가 = 최대가 ÷ 2</code>를 정확히 만족합니다.</p>
+<blockquote class="warn"><strong>기존 전체평균가를 원가로 사용하면 손실이 발생합니다.</strong></blockquote>
+<h3>(3) 0원의 두 가지 성격은 구분해야 한다</h3>
+<p><code>srDesc</code>(발생사유)에 무상 여부가 기재되어 있습니다.</p>
+<div class='tblwrap'><table><thead><tr><th>사례</th><th>내용</th><th>판정</th></tr></thead><tbody><tr><td>218823100C</td><td>입고 55,000원 → 출고 0원</td><td>단가 <strong>미입력</strong></td></tr><tr><td>1778810600</td><td>입고 0원 (사유 &quot;한성에서 무료&quot;) → 출고 0원</td><td><strong>정당한 무상</strong></td></tr></tbody></table></div>
+<p>무상은 원가 0이 맞고, 미입력은 원가 계산에서 제외해야 합니다. 사유에 <strong>무료·무상·서비스·증정·샘플</strong>이 포함되면 무상으로 확정합니다.</p>
+<hr>
+<h2>2. 선입선출(FIFO) 재생</h2>
+<p>집계값으로는 <strong>어느 시점에 입고된 재고가 남아 있는지</strong> 알 수 없습니다. <code>stockNo</code>는 매입 로트가 아니라 부품별 재고 등록 단위이기 때문입니다 (성수 기준 stockNo 약 2,183개 vs 부품 2,180개로 사실상 1:1). 게다가 지점 간에는 같은 번호가 서로 다른 부품을 가리킵니다.</p>
+<p>그래서 이동내역을 <strong>실입출고일(<code>srRealYmd</code>) 순으로 재생</strong>해 잔여 재고를 직접 추적합니다.</p>
+<pre class="eq">입고 2024-05-09  2개 @30,000원
+입고 2025-02-11  3개 @45,000원
+출고 2025-08-08  2개          → 먼저 입고된 30,000원 2개가 소진
+                              → 잔여 3개는 전부 45,000원
+
+보유재고 원가 = 45,000원</pre>
+<h3>출고 초과분 처리</h3>
+<p>재고보다 많이 출고된 기록이 있습니다. 이 경우 <strong>그 시점에 버리지 않고 &#x27;미충당분&#x27;으로 이월해 이후 입고에서 차감</strong>합니다.</p>
+<p>이월하지 않으면 이후 입고분이 소진되지 않아 재고가 과대계상됩니다. 이월 처리로 최종 잔여수량이 시스템 재고(<code>SUM(storeEa) − SUM(releaseEa)</code>)와 일치합니다.</p>
+<hr>
+<h2>3. 매입단가 확정 우선순위</h2>
+<div class='tblwrap'><table><thead><tr><th>순위</th><th>근거</th><th>등급</th></tr></thead><tbody><tr><td>1</td><td><strong>FIFO 잔여재고 원가</strong> — 지금 보유한 재고의 실제 원가. 가장 정확</td><td>A · B</td></tr><tr><td>2</td><td><strong>최근 매입단가</strong> — 잔여분 원가가 미상일 때</td><td>C</td></tr><tr><td>3</td><td><strong>가중평균 매입원가</strong> — 수량을 반영한 평균</td><td>C</td></tr><tr><td>4</td><td><strong>전량 무상 입고</strong> — 사유에 무료·무상 명시. 원가 0</td><td>N</td></tr><tr><td>5</td><td><strong>판매가 역산</strong> — 매입 기록 없이 판매 실적만 있을 때 (추정)</td><td>D</td></tr><tr><td>6</td><td><strong>센터가 × 할인율</strong> — 위 모두 불가할 때 (별도 다운로드)</td><td>F</td></tr></tbody></table></div>
+<h3>등급 정의</h3>
+<div class='tblwrap'><table><thead><tr><th>등급</th><th>의미</th><th>판단 기준</th></tr></thead><tbody><tr><td><strong>A</strong></td><td>확정 — 교차검증됨</td><td>FIFO 원가 확정 + 유가 입고 2건 이상</td></tr><tr><td><strong>B</strong></td><td>확정 — 단일 매입</td><td>FIFO 원가 확정 + 유가 입고 1건</td></tr><tr><td><strong>C</strong></td><td>일부 수량 원가 미상</td><td>잔여 재고 중 일부만 원가 확인</td></tr><tr><td><strong>D</strong></td><td>추정 — 판매가 역산</td><td>매입 기록 없음. 확정값 아님</td></tr><tr><td><strong>N</strong></td><td>무상 입고</td><td>원가 0이 맞음</td></tr><tr><td><strong>F</strong></td><td>산출 불가</td><td>매입·판매 단가 모두 없음 → 센터가로 대체</td></tr></tbody></table></div>
+<h3>판매가 역산 (D등급)</h3>
+<p>매입 기록이 없지만 판매 실적이 있으면, 전사 실현마진 중앙값으로 역산합니다.</p>
+<pre class="eq">추정원가 = 가중평균판매가 ÷ 1.171</pre>
+<p>실현마진 1.171은 원가·판매가가 모두 있는 부품 402개에서 산출한 중앙값입니다. <strong>추정값이므로 확정 전 검토가 필요합니다.</strong></p>
+<hr>
+<h2>4. F등급 — 센터가 기반 매입가</h2>
+<p>매입·판매 단가가 모두 없는 부품은 부품마스터(<code>epmsPartMst</code>)의 <strong>센터가</strong>에 메이커별 할인율을 적용합니다.</p>
+<pre class="eq">매입가 = 센터가 × (1 − 할인율 ÷ 100)</pre>
+<p>예: BMW 헤드램프 센터가 6,385,500원 · 할인율 10% → <strong>5,746,950원</strong></p>
+<p>할인율은 <code>사용중_메이커_리스트_할인율적용</code> 파일에서 읽습니다. 표에 없는 메이커 4개는 담당자 확인값을 사용했습니다.</p>
+<div class='tblwrap'><table><thead><tr><th>메이커</th><th>할인율</th><th>출처</th></tr></thead><tbody><tr><td>VA</td><td>16%</td><td>담당자 확인</td></tr><tr><td>JL</td><td>0%</td><td>담당자 확인</td></tr><tr><td>LT</td><td>0%</td><td>담당자 확인</td></tr><tr><td>CJ</td><td>10%</td><td>담당자 확인</td></tr></tbody></table></div>
+<blockquote class="warn"><strong>주의</strong> — <code>epmsPartStock</code>의 <code>centerPrice</code>·<code>purchasePrice</code>는 대부분 0이라 사용할 수 없습니다. 부품마스터(<code>epmsPartMst</code>)의 값을 써야 합니다.  NSS는 할인율이 <strong>−3%</strong> 로 등록되어 있어 센터가보다 3% 높게 산출됩니다.</blockquote>
+<hr>
+<h2>5. 예외 처리</h2>
+<p>담당자 확인을 거쳐 개별 적용한 건입니다. 산출 스크립트 상단에 상수로 분리해 두었습니다.</p>
+<div class='tblwrap'><table><thead><tr><th>구분</th><th>대상</th><th>처리</th></tr></thead><tbody><tr><td>품번 정정</td><td><code>9673271377</code> → <code>1607254580</code></td><td>오등록 품번. 이동내역을 읽는 시점에 치환</td></tr><tr><td>재고 예외</td><td><code>NQ0810078</code></td><td>재고조사 오류로 실물 없음. 재고 0 처리</td></tr></tbody></table></div>
+<p>수량 오입력 3건(음수 수량)은 0으로 보정하고 별도 표시합니다. <code>releaseEa = −7</code>을 그대로 두면 <code>재고 = 입고 − 출고</code>에서 재고가 오히려 7 늘어납니다.</p>
+<hr>
+<h2>6. 참고 지표</h2>
+<div class='tblwrap'><table><thead><tr><th>지표</th><th>정의</th></tr></thead><tbody><tr><td><strong>평균 입고경과일</strong></td><td>남은 재고가 입고된 뒤 지난 일수의 <strong>수량가중 평균</strong>. 기준일 2026-08-13</td></tr><tr><td><strong>최장 입고경과일</strong></td><td>남은 재고 중 가장 오래된 입고분의 경과일</td></tr><tr><td><strong>소진예상일수</strong></td><td><code>현재고 ÷ (최근 12개월 출고량 ÷ 365)</code>. 최근 1년 출고가 없으면 <code>정체</code></td></tr></tbody></table></div>
+<p>평균 입고경과일은 <strong>평균이므로 실제로 존재하지 않는 값</strong>이 나올 수 있습니다. 589일 된 10개와 224일 된 10개가 섞여 있으면 평균은 406일이지만, 406일짜리 재고는 한 개도 없습니다. 최장 입고경과일을 함께 보면 섞임 정도가 드러납니다.</p>
+<hr>
+<h2>7. 한계</h2>
+<ul><li>본 산출은 <strong>기록된 단가에 근거</strong>합니다. 애초에 잘못 입력된 단가는 걸러낼 수 없습니다.</li><li>실현마진 역산(D등급)은 전사 단일값을 쓰므로 부품별 오차가 있습니다.</li><li>3년 이상 경과한 재고는 과거 매입단가와 현재 시세의 괴리가 클 수 있어, 주문 기준가로 사용 시 공급처 재확인이 필요합니다.</li><li>재고 보유 부품의 94%가 최근 1년간 출고 이력이 없어 <strong>발주 우선순위 판단 근거가 부족</strong>합니다.</li><li>공급처(<code>supplyCompanyNo</code>)는 대부분 미입력이라 매입처별 단가 비교가 불가능합니다.</li></ul>
+<blockquote class="warn"><strong>근본 해결은 입고 시 단가 필수 입력입니다.</strong> 현재 입고 건의 42%에 단가가 없어, 이런 추정 작업이 반복될 수밖에 없습니다. 단가 입력을 필수화하고 선입선출을 적용하면 이후에는 정확한 원가가 자동으로 유지됩니다.</blockquote>
+  <p class="foot">이 문서는 <code>매입단가_산출방법.md</code>에서 생성됩니다.
+  내용을 고치려면 <code>.md</code>를 수정하고 <code>python build_maeip.py</code>를 실행하세요.<br>
+  <a href="index.html">산출 결과 페이지</a></p>
+</div>
+<script>
+document.getElementById("thm").onclick=()=>{
+  const cur=document.documentElement.getAttribute("data-theme");
+  const dark=cur? cur==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.setAttribute("data-theme", dark?"light":"dark");};
+</script>
+</body>
+</html>

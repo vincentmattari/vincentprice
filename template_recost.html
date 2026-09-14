@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>센터가 기준 매입단가 재산정</title>
+<style>
+:root{
+  color-scheme: light;
+  --surface-1:#fcfcfb; --plane:#f9f9f7;
+  --ink-1:#0b0b0b; --ink-2:#52514e; --ink-3:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
+  --g-a:#0ca30c; --g-b:#2a78d6; --g-c:#c98500; --g-d:#d03b3b; --g-f:#898781; --g-n:#4a3aa7; --g-g:#eb6834;
+  --accent:#2a78d6;
+}
+@media (prefers-color-scheme: dark){:root:where(:not([data-theme="light"])){
+  color-scheme: dark;
+  --surface-1:#1a1a19; --plane:#0d0d0d;
+  --ink-1:#fff; --ink-2:#c3c2b7; --ink-3:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --g-a:#0ca30c; --g-b:#3987e5; --g-c:#c98500; --g-d:#d03b3b; --g-f:#898781; --g-n:#9085e9; --g-g:#d95926;
+  --accent:#3987e5;
+}}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --surface-1:#1a1a19; --plane:#0d0d0d;
+  --ink-1:#fff; --ink-2:#c3c2b7; --ink-3:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --g-a:#0ca30c; --g-b:#3987e5; --g-c:#c98500; --g-d:#d03b3b; --g-f:#898781; --g-n:#9085e9; --g-g:#d95926;
+  --accent:#3987e5;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink-1);
+  font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic",sans-serif;
+  font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1900px;margin:0 auto;padding:28px 20px 80px;position:relative}
+h1{font-size:26px;line-height:1.25;margin:0 0 6px;letter-spacing:-.02em;max-width:80ch}
+h2{font-size:17px;margin:0 0 14px;letter-spacing:-.01em}
+.sub{color:var(--ink-2);margin:0 0 24px;max-width:130ch}
+.card{background:var(--surface-1);border:1px solid var(--ring);border-radius:12px;padding:20px;margin-bottom:18px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:12px;margin-bottom:18px}
+.tile{background:var(--surface-1);border:1px solid var(--ring);border-radius:12px;padding:16px 18px}
+.tile .k{font-size:12px;color:var(--ink-2);margin-bottom:6px}
+.tile .v{font-size:26px;font-weight:640;letter-spacing:-.02em;line-height:1.15}
+.tile .n{font-size:11.5px;color:var(--ink-3);margin-top:4px}
+.gchart{display:grid;grid-template-columns:auto 1fr auto;gap:9px 12px;align-items:center;max-width:820px}
+.gchart .gl{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+.gchart .gl b{color:var(--ink-1);font-size:13px;width:12px;display:inline-block}
+.gtrack{background:var(--grid);border-radius:4px;height:20px;overflow:hidden}
+.gtrack i{display:block;height:100%;border-radius:0 4px 4px 0;transition:width .25s}
+.gval{font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink-1);font-weight:620;white-space:nowrap}
+.gval span{color:var(--ink-3);font-weight:400;margin-left:5px}
+.dot{width:9px;height:9px;border-radius:2px;flex:none}
+.ctrls{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end}
+.fld{display:flex;flex-direction:column;gap:5px}
+.fld label{font-size:11.5px;color:var(--ink-2);font-weight:560}
+input[type=search],select{background:var(--plane);color:var(--ink-1);border:1px solid var(--axis);
+  border-radius:7px;padding:7px 10px;font:inherit;font-size:13px;min-width:150px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--axis);background:var(--plane);color:var(--ink-2);border-radius:999px;
+  padding:5px 11px;font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit}
+.chip[aria-pressed=true]{border-color:var(--accent);color:var(--ink-1);
+  background:color-mix(in srgb,var(--accent) 12%,transparent);font-weight:600}
+.btn{border:1px solid var(--axis);background:var(--plane);color:var(--ink-1);border-radius:7px;
+  padding:8px 14px;font:inherit;font-size:13px;font-weight:560;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+/* 필터 줄 고정 — 스크롤해도 조건이 계속 보이게 */
+.ctrls.stick{position:sticky;top:0;z-index:7;background:var(--surface-1);
+  padding:14px 0 13px;border-bottom:1px solid var(--grid);margin-bottom:0}
+/* 표 영역이 자체 스크롤을 갖게 해야 th 의 sticky 가 실제로 동작한다.
+   (overflow-x 만 주면 세로도 스크롤 컨테이너가 되어 헤더가 같이 밀려 올라간다) */
+.tblwrap{overflow:auto;max-height:calc(100vh - 210px);
+  border:1px solid var(--ring);border-radius:12px;background:var(--surface-1)}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+th,td{padding:7px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--grid)}
+th{position:sticky;top:0;background:var(--surface-1);color:var(--ink-2);font-size:11.5px;font-weight:620;
+  text-align:right;cursor:pointer;user-select:none;z-index:3;
+  box-shadow:inset 0 -1px var(--axis), 0 1px 0 var(--axis)}
+th:hover{color:var(--ink-1)}
+th.l,td.l{text-align:left}
+td{font-variant-numeric:tabular-nums;color:var(--ink-2)}
+td.pn{font-family:ui-monospace,Consolas,monospace;color:var(--ink-1);font-size:12.5px}
+a.plink{color:var(--ink-1);text-decoration:none;border-bottom:1px dotted var(--axis)}
+a.plink:hover{color:var(--accent);border-bottom-color:var(--accent)}
+td.nm{color:var(--ink-1);max-width:190px;overflow:hidden;text-overflow:ellipsis}
+td.hero{color:var(--ink-1);font-weight:650}
+td.why{color:var(--ink-3);font-size:11.5px;max-width:210px;overflow:hidden;text-overflow:ellipsis}
+tbody tr:hover{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.gb{display:inline-flex;align-items:center;gap:5px;font-weight:640;font-size:12px;color:var(--ink-1)}
+.muted{color:var(--ink-3)}
+.foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;
+  padding:12px 4px;font-size:12.5px;color:var(--ink-2)}
+.warn{border-left:3px solid var(--g-d);background:color-mix(in srgb,var(--g-d) 8%,transparent);
+  border-radius:7px;padding:12px 15px;margin:14px 0;font-size:13px;color:var(--ink-2)}
+.warn strong{color:var(--ink-1)}
+.note{border-left:3px solid var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent);
+  border-radius:7px;padding:12px 15px;margin:14px 0;font-size:13px;color:var(--ink-2)}
+.note strong{color:var(--ink-1)}
+.gl-desc{color:var(--ink-3);font-size:11.5px;margin-left:4px}
+.thm{position:absolute;top:20px;right:20px}
+.mlink{display:inline-block;margin-top:8px;color:var(--accent);font-weight:560;text-decoration:none}
+.mlink:hover{text-decoration:underline}
+@media(max-width:640px){.wrap{padding:20px 13px 60px}h1{font-size:21px}.tile .v{font-size:22px}}
+.scope{font-size:.44em;font-weight:600;vertical-align:middle;margin-left:10px;
+  padding:4px 10px;border-radius:999px;background:var(--axis);color:var(--ink-2)}
+td.br,th.br{white-space:nowrap}
+.bdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:middle}
+table.brt{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
+table.brt th,table.brt td{padding:8px 12px;text-align:right;border-bottom:1px solid var(--axis)}
+table.brt th.l,table.brt td.l{text-align:left}
+table.brt th{color:var(--ink-2);font-weight:600}
+.qpart{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:999px;
+  font-size:10.5px;font-weight:600;background:color-mix(in srgb,var(--g-c) 20%,transparent);
+  color:var(--ink-1);vertical-align:middle}
+.qpart.ok{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--ink-2);font-weight:500}
+.delta.up{color:var(--g-a);font-weight:640}
+.delta.dn{color:var(--g-d);font-weight:640}
+table.sum{width:100%;border-collapse:collapse;font-size:13px}
+table.sum th,table.sum td{padding:8px 12px;text-align:right;border-bottom:1px solid var(--axis);
+  white-space:nowrap;position:static;cursor:default;box-shadow:none}
+table.sum th.l,table.sum td.l{text-align:left}
+table.sum th{color:var(--ink-2);font-weight:600;background:transparent}
+table.sum tr.keep td{color:var(--ink-3)}
+table.sum tr.tot td{border-top:2px solid var(--axis);border-bottom:none;
+  font-weight:660;color:var(--ink-1);padding-top:11px}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin:4px 0 2px}
+.flow .box{border:1px solid var(--ring);border-radius:10px;padding:12px 16px;background:var(--plane)}
+.flow .box .k{font-size:11.5px;color:var(--ink-2);margin-bottom:3px}
+.flow .box .v{font-size:20px;font-weight:640;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.flow .op{font-size:19px;color:var(--ink-3);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+<button class="btn thm" id="thm" type="button">◐ 테마</button>
+
+<h1>센터가 기준 매입단가 재산정 <span class="scope">C · D · G · F 등급</span></h1>
+<p class="sub">C·D·F·G 등급은 <strong>확정된 단가가 있더라도 전량을</strong> <strong>센터가 × (1 − 메이커 할인율)</strong> 로
+다시 매기고, 그 단가로 재고 평가액을 다시 계산했습니다. A·B·N 등급은 실제 매입 기록이 있어 그대로 둡니다.
+아래 목록에는 <strong>매입가가 확실한 A·B 등급도 함께</strong> 실어, 확정 매입단가와 센터가를 나란히 볼 수 있게 했습니다
+(A·B 는 재산정하지 않으므로 할인율·재산정단가는 비어 있습니다).
+추후 <strong>실제 공급가</strong>를 확보하면 이 센터가 재산정값과 다시 대조할 예정입니다.
+<a class="mlink" style="margin-right:18px" href="index.html">통합 결과 보기 →</a>
+<a class="mlink" style="margin-right:18px" href="F등급_매입가.html">F등급 발생사유별 검토 →</a>
+<a class="mlink" style="margin-right:18px" href="재고_센터가_매입처_기준_매입단가_재산정.html">재고·센터가·매입처 기준 비교 →</a>
+<a class="mlink" href="매입단가_산출방법.html">산출 방법 자세히 보기 →</a></p>
+
+<div class="tiles" id="tiles"></div>
+
+<div class="card">
+  <h2>재고 평가액 — 재산정 전후</h2>
+  <div class="flow" id="flow"></div>
+  <div style="overflow-x:auto;margin-top:14px"><table class="sum"><thead><tr>
+    <th class="l">등급</th><th class="l">처리</th><th>부품</th><th>재고 수량</th>
+    <th title="입고 단가가 기록돼 있는 수량">원가 확인</th>
+    <th title="입고 단가가 0원(미기재)이라 금액을 매길 수 없는 수량">원가 미상</th>
+    <th title="원가가 확인된 수량에만 매긴 금액. 재고 전량이 아니다">확정원가 평가액</th>
+    <th title="재산정 대상은 재고 전량 × 재산정단가">재산정 평가액</th><th>증감</th>
+  </tr></thead><tbody id="sumtb"></tbody></table></div>
+  <div class="note" id="basisnote"></div>
+</div>
+
+<div class="card" id="brcard" hidden>
+  <h2>지점별</h2>
+  <div style="overflow-x:auto"><table class="sum"><thead><tr>
+    <th class="l">지점</th><th>대상 부품</th><th>재산정 가능</th><th>재고 수량</th>
+    <th>현행 평가액</th><th>재산정 평가액</th><th>증감</th>
+  </tr></thead><tbody id="brtb"></tbody></table></div>
+</div>
+
+<div class="card">
+  <h2 id="listh">재산정 대상 부품</h2>
+  <div class="ctrls stick">
+    <div class="fld"><label for="q">품번 · 부품명 검색</label>
+      <input type="search" id="q" placeholder="품번 또는 부품명 일부" autocomplete="off"></div>
+    <div class="fld" id="brfld"><label for="br">지점</label><select id="br"></select></div>
+    <div class="fld"><label for="mk">메이커</label><select id="mk"></select></div>
+    <div class="fld"><label for="sc">재산정</label>
+      <select id="sc">
+        <option value="">전체</option>
+        <option value="ok">재산정 산출된 것만</option>
+        <option value="no">재산정 못한 것만</option>
+        <option value="keep">A·B 확정분만</option>
+      </select></div>
+    <div class="fld"><label>등급</label><div class="chips" id="gchips"></div></div>
+    <div class="fld"><label for="pp">표시 행수</label>
+      <select id="pp"><option>50</option><option selected>100</option><option>300</option><option value="99999">전체</option></select></div>
+    <button class="btn pri" id="csv" type="button">CSV 내려받기</button>
+  </div>
+  <div class="tblwrap">
+    <table><thead><tr id="thr"></tr></thead><tbody id="tb"></tbody></table>
+  </div>
+  <div class="foot">
+    <span id="cnt" class="muted"></span>
+    <span><button class="btn" id="prev" type="button">이전</button>
+      <button class="btn" id="next" type="button">다음</button></span>
+  </div>
+</div>
+
+<div class="card">
+  <h2>읽기 전 확인</h2>
+  <div class="warn" id="cautions"></div>
+</div>
+
+<div class="foot"><span id="meta" class="muted"></span></div>
+</div>
+
+<script>
+const D = /*__DATA__*/;
+const F = D.fields;
+const I={}; F.forEach((k,i)=>I[k]=i);
+["품번","지점","등급","현재고수량","매입단가","센터가","할인율",
+ "재산정대상","재산정단가","적용단가","현행평가액","재산정평가액","평가액증감"]
+  .forEach(k=>{ if(I[k]===undefined) console.error("데이터에 필드 없음:",k); });
+const S=D.summary, RC=S.재산정;
+const ALL=D.items.filter(r=>r[I.현재고수량]>0);          /* 재고 보유분만 다룬다 */
+/* 표에는 재산정 대상(C·D·F·G)과 함께 매입가가 확실한 A·B 도 싣는다.
+   A·B 는 확정 매입단가와 센터가를 나란히 보기 위한 참고용이라 재산정하지 않는다.
+   (N = 무상 입고는 원가 0 이 맞으므로 비교 대상이 아니어서 제외) */
+const KEEP=["A","B"];
+const R=ALL.filter(r=>r[I.재산정대상]==="Y" || KEEP.includes(r[I.등급]));
+/* 등급 표기 순서 — 유지 등급 먼저, G(위탁재고)는 맨 뒤 */
+const GORD="ABNCDFG";
+const GC={A:"var(--g-a)",B:"var(--g-b)",C:"var(--g-c)",D:"var(--g-d)",N:"var(--g-n)",G:"var(--g-g)",F:"var(--g-f)"};
+const GN={A:"확정 — 교차검증됨",B:"확정 — 단일 매입",C:"일부 수량 원가 미상",
+          D:"추정 — 판매가 역산",N:"무상 입고 (원가 0)",G:"위탁재고 — 자사 매입 아님",F:"확인 불가"};
+const TG=RC.대상등급;
+const nf=n=>n==null?"—":n.toLocaleString("ko-KR");
+const won=n=>n==null?"—":Math.round(n).toLocaleString("ko-KR")+"원";
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const LINKBASE="https://carang.ipartsnet.co.kr/epmsV3/stock/partStockStoreRelease.asp";
+const pnCell = r => {
+  const sn = r[I.재고번호];
+  const u = LINKBASE + "?keyword=" + encodeURIComponent(r[0]) + (sn!=null ? "&stockNo="+encodeURIComponent(sn) : "");
+  return `<a class="plink" href="${u}" target="_blank" rel="noopener" title="재고 입출고 내역 열기">${esc(r[0])}</a>`;
+};
+/* 평가액 칸 — 무엇에 몇 개를 곱한 금액인지가 칸 안에서 보이게 한다 */
+function valCell(r){
+  const v=r[I.재산정평가액], q=r[I.현재고수량], ok=r[I.원가확인수량];
+  if(r[I.적용단가]==null){
+    /* 재산정 못 한 건. 확정 원가분을 그대로 두므로 그 사실을 밝힌다. */
+    if(v==null) return '<span class="muted" title="적용할 단가가 없어 금액을 매길 수 없습니다">—</span>';
+    return nf(v)+`<span class="qpart" title="재산정하지 못해 확정 원가분 ${ok}개만 그대로 둔 금액입니다">현행 ${ok}/${q}개분</span>`;
+  }
+  if(v==null) return '<span class="muted">—</span>';
+  /* 적용단가는 반올림값이라 선입선출 레이어별 단가로 계산한 정확한 금액과
+     몇 원 차이가 날 수 있다. 어긋나는 행에만 그 사실을 알려 준다. */
+  const calc=Math.round(r[I.적용단가]*q);
+  const tip = calc===v ? `재고 전량 ${q}개 × 적용단가`
+    : `선입선출 레이어별 단가로 계산한 정확한 금액입니다. 적용단가(${nf(r[I.적용단가])})는 `
+      +`이를 수량으로 나눠 반올림한 평균이라 ${nf(calc)}원과 ${nf(Math.abs(calc-v))}원 차이가 납니다.`;
+  return nf(v)+`<span class="qpart ok" title="${tip}">${calc===v?"전량":"전량*"}</span>`;
+}
+const dcell = v => v==null ? '<span class="muted">—</span>'
+  : (v===0 ? '<span class="muted">0</span>'
+    : `<span class="delta ${v>0?'up':'dn'}">${v>0?'+':''}${nf(v)}</span>`);
+
+/* 지점 */
+/* 지점 순서는 데이터 등장 순이 아니라 산출 스크립트가 정한 순서(BRANCHES)를 따른다.
+   등장 순으로 잡으면 재고평가액이 큰 지점이 앞으로 와 회차마다 순서가 바뀐다. */
+const BRS=(S.지점목록||[]).filter(b=>ALL.some(r=>r[I.지점]===b))
+  .concat([...new Set(ALL.map(r=>r[I.지점]).filter(Boolean))]
+            .filter(b=>!(S.지점목록||[]).includes(b)));
+const BRPAL=["#3b82f6","#f59e0b","#10b981","#a855f7"];
+const BRC=b=>BRPAL[Math.max(0,BRS.indexOf(b))%BRPAL.length];
+
+const LISTG=GORD.split("").filter(g=>TG.includes(g)||KEEP.includes(g));
+let page=0, sortK="재산정평가액", sortD=-1, q="", mk="", br="", sc="",
+    gsel=new Set(LISTG);
+
+/* ---------- 상단 타일 ---------- */
+{
+  const 증감=RC.재산정총액-RC.현행총액;
+  const t=[
+    ["재산정 대상", nf(RC.대상부품)+"개", TG.join("·")+" 등급 · 재고 "+nf(RC.대상수량)+"개"],
+    ["재산정 산출됨", nf(RC.재산정가능)+"개",
+      RC.재산정불가>0 ? "센터가·할인율 없어 못한 것 "+nf(RC.재산정불가)+"개" : "대상 전부 산출"],
+    ["현행 재고 평가액", won(RC.현행총액),
+      "원가가 확인된 "+nf(RC.확인수량합)+"개분만 — 재고 전량 아님"],
+    ["재산정 후 평가액", won(RC.재산정총액), "A·B·N 유지 + "+TG.join("·")+" 전량 센터가"],
+    ["평가액 증감", (증감>0?"+":"")+won(증감),
+      RC.현행총액>0 ? ((증감/RC.현행총액*100).toFixed(1)+"%") : "—"],
+  ];
+  document.getElementById("tiles").innerHTML=t.map(([k,v,n])=>
+    `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join("");
+}
+
+/* ---------- 전후 흐름 ---------- */
+{
+  const 유지=RC.현행총액-RC.대상현행;
+  document.getElementById("flow").innerHTML=
+    `<div class="box"><div class="k">A·B·N 유지분</div><div class="v">${won(유지)}</div></div>
+     <span class="op">+</span>
+     <div class="box"><div class="k">${TG.join("·")} 재산정분</div><div class="v">${won(RC.대상재산정)}</div></div>
+     <span class="op">=</span>
+     <div class="box" style="border-color:var(--accent)"><div class="k">재산정 후 재고 평가액</div>
+       <div class="v">${won(RC.재산정총액)}</div></div>`;
+}
+
+/* ---------- 등급별 표 ---------- */
+{
+  const g=RC.등급별, rows=[];
+  GORD.split("").forEach(k=>{
+    const x=g[k]; if(!x) return;
+    const 대상=x.재산정대상==="Y";
+    rows.push(`<tr class="${대상?'':'keep'}">
+      <td class="l"><span class="gb"><i class="dot" style="background:${GC[k]}"></i>${k}</span>
+        <span class="gl-desc">${GN[k]}</span></td>
+      <td class="l">${대상?'<strong>센터가로 재산정</strong>':'유지'}</td>
+      <td>${nf(x.부품)}</td><td>${nf(x.수량)}</td>
+      <td>${nf(x.확인수량)}</td><td>${x.미상수량?'<span class="delta dn">'+nf(x.미상수량)+'</span>':'<span class="muted">0</span>'}</td>
+      <td>${nf(x.현행)}</td><td>${nf(x.재산정)}</td>
+      <td>${dcell(x.재산정-x.현행)}</td></tr>`);
+  });
+  const cq=Object.values(g).reduce((a,x)=>a+x.확인수량,0), mq=Object.values(g).reduce((a,x)=>a+x.미상수량,0);
+  rows.push(`<tr class="tot"><td class="l">합계</td><td class="l"></td>
+    <td>${nf(S.재고보유)}</td><td>${nf(S.재고수량)}</td>
+    <td>${nf(cq)}</td><td>${nf(mq)}</td>
+    <td>${nf(RC.현행총액)}</td><td>${nf(RC.재산정총액)}</td>
+    <td>${dcell(RC.재산정총액-RC.현행총액)}</td></tr>`);
+  document.getElementById("sumtb").innerHTML=rows.join("");
+}
+
+document.getElementById("basisnote").innerHTML=
+  `<strong>양쪽의 산정 기준</strong><br>
+   · <strong>현행 평가액</strong> = 선입선출로 재생한 잔여 재고 중 <strong>입고 단가가 기록돼 있던 수량만</strong> × 그 단가.
+     <a class="plink" href="index.html">통합 결과 페이지</a>의 재고 평가액과 <strong>정확히 같은 값</strong>입니다.
+     빌려온 최근 매입단가나 판매가 역산 같은 <em>미확정 값은 섞지 않습니다.</em><br>
+   · <strong>재산정 평가액</strong> = ${TG.join("·")} 는 확정 단가가 있더라도 <strong>재고 전량</strong> × 센터가 × (1 − 할인율).
+     A·B·N 과 센터가가 없어 재산정하지 못한 건은 현행 그대로 둡니다.<br>
+   <br>
+   그래서 증감 ${won(RC.재산정총액-RC.현행총액)} 안에는 성격이 다른 두 가지가 섞여 있습니다.<br>
+   · <strong>값이 없던 수량에 값이 생긴 것</strong> — 원가 미상 ${nf(RC.대상미상수량)}개 →
+     <strong>${won(RC.신규측정분)}</strong><br>
+   · <strong>이미 확정돼 있던 원가를 센터가로 바꾼 것</strong> — 원가 확인 ${nf(RC.대상확인수량)}개 →
+     <strong>${(RC.재가격분>0?"+":"")+won(RC.재가격분)}</strong>
+     ${RC.재가격분>0?"(센터가가 실제 매입원가보다 높다는 뜻)":"(센터가가 실제 매입원가보다 낮다는 뜻)"}
+   ${RC.등급별.G ? `<br><br>· <strong>G등급(위탁재고 ${nf(RC.등급별.G.부품)}개)은 자사 매입 재고가 아닙니다.</strong>
+   요청에 따라 재산정에 포함했으나, 자산 평가액에 넣을지는 별도 판단이 필요합니다.` : ""}`;
+
+/* ---------- 지점별 ---------- */
+if(BRS.length>1){
+  const rows=BRS.map(b=>{
+    const t=R.filter(r=>r[I.지점]===b);
+    const ok=t.filter(r=>r[I.재산정단가]!=null);
+    const cur=t.reduce((a,r)=>a+(r[I.현행평가액]||0),0);
+    const nw=t.reduce((a,r)=>a+(r[I.재산정평가액]||0),0);
+    return `<tr><td class="l"><i class="bdot" style="background:${BRC(b)}"></i><strong>${esc(b)}</strong></td>
+      <td>${nf(t.length)}</td><td>${nf(ok.length)}</td>
+      <td>${nf(t.reduce((a,r)=>a+r[I.현재고수량],0))}</td>
+      <td>${nf(cur)}</td><td>${nf(nw)}</td><td>${dcell(nw-cur)}</td></tr>`;
+  }).join("");
+  document.getElementById("brtb").innerHTML=rows;
+  document.getElementById("brcard").hidden=false;
+}
+
+/* ---------- 표 ---------- */
+/* [키, 클래스, 표시이름, 설명(마우스 올리면 뜸)] */
+const COLS=[["품번","l"],["지점","br l"],["부품명","l"],["메이커","l"],["등급","l"],
+            ["현재고수량","","재고 수량"],
+            ["원가확인수량","","├ 원가 확인","입고 단가가 기록돼 있어 금액을 매길 수 있는 수량"],
+            ["원가미상수량","","└ 원가 미상","입고 단가가 0원(미기재)이라 금액을 매길 수 없는 수량"],
+            ["매입단가","","매입단가","현행 확정 단가. 근거 열에 무엇을 근거로 삼았는지 적혀 있다"],
+            ["센터가",""],["할인율",""],
+            ["재산정단가","","재산정단가","센터가 × (1 − 할인율). C·D·F·G 만 산출한다"],
+            ["적용단가","h","적용단가","이 부품의 재고를 평가할 때 실제로 쓰는 단가"],
+            ["단가기준","l","단가 기준","적용단가를 어디서 가져왔는가"],
+            ["재산정평가액","","평가액","적용단가 × 재고 전량"],
+            ["근거","l","현행 산출근거"]];
+function head(){
+  document.getElementById("thr").innerHTML=COLS.map(([k,c,label,tip])=>
+    `<th class="${c.includes('l')?'l':''}" data-k="${k}"${tip?` title="${tip}"`:""}>${label||k}${sortK===k?(sortD<0?" ▾":" ▴"):""}</th>`).join("");
+  document.querySelectorAll("#thr th").forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k; if(sortK===k) sortD*=-1; else {sortK=k;sortD=-1;} page=0; draw();});
+}
+function filtered(){
+  let a=R.filter(r=>gsel.has(r[I.등급])
+    && (!br || r[I.지점]===br)
+    && (!mk || r[I.메이커]===mk)
+    && (!sc || (sc==="keep" ? r[I.재산정대상]!=="Y"
+                : r[I.재산정대상]==="Y" && (sc==="ok" ? r[I.재산정단가]!=null
+                                                     : r[I.재산정단가]==null)))
+    && (!q || r[0].toLowerCase().includes(q) || (r[I.부품명]||"").toLowerCase().includes(q)));
+  a.sort((x,y)=>{
+    if(sortK==="등급")   /* 알파벳순이면 G 가 N 앞으로 온다 — 표기 순서를 따른다 */
+      return (GORD.indexOf(x[I.등급])-GORD.indexOf(y[I.등급]))*sortD;
+    if(["품번","지점","부품명","메이커","등급","단가기준","센터가산출","근거"].includes(sortK))
+      return String(x[I[sortK]]||"").localeCompare(String(y[I[sortK]]||""),"ko")*sortD;
+    const u=x[I[sortK]], v=y[I[sortK]];
+    if(u==null&&v==null) return 0;
+    if(u==null) return 1;
+    if(v==null) return -1;
+    return (u-v)*sortD;
+  });
+  return a;
+}
+function draw(){
+  const a=filtered(), pp=+document.getElementById("pp").value;
+  const np=Math.max(1,Math.ceil(a.length/pp));
+  if(page>=np) page=np-1;
+  document.getElementById("tb").innerHTML=a.slice(page*pp,(page+1)*pp).map(r=>{
+    const g=r[I.등급];
+    return `<tr>
+<td class="l pn">${pnCell(r)}</td>
+<td class="l br"><i class="bdot" style="background:${BRC(r[I.지점])}"></i>${esc(r[I.지점]||"")}</td>
+<td class="l nm">${r[I.부품명]?esc(r[I.부품명]):'<span class="muted">—</span>'}</td>
+<td class="l">${r[I.메이커]?esc(r[I.메이커]):'<span class="muted">—</span>'}</td>
+<td class="l"><span class="gb"><i class="dot" style="background:${GC[g]}"></i>${g}</span></td>
+<td>${nf(r[I.현재고수량])}</td>
+<td>${r[I.원가확인수량]?nf(r[I.원가확인수량]):'<span class="muted">0</span>'}</td>
+<td>${r[I.원가미상수량]?'<span class="delta dn">'+nf(r[I.원가미상수량])+'</span>':'<span class="muted">0</span>'}</td>
+<td>${r[I.매입단가]==null?'<span class="muted">—</span>':nf(r[I.매입단가])}</td>
+<td>${nf(r[I.센터가])}</td>
+<td>${r[I.재산정대상]!=="Y"||r[I.할인율]==null?'<span class="muted">—</span>':r[I.할인율]+"%"}</td>
+<td>${r[I.재산정단가]==null?'<span class="muted">—</span>':nf(r[I.재산정단가])}</td>
+<td class="hero">${r[I.적용단가]==null?'<span class="muted">—</span>':nf(r[I.적용단가])}</td>
+<td class="l why">${r[I.단가기준]&&r[I.단가기준].indexOf("산출 불가")===0
+   ? '<span class="delta dn">'+esc(r[I.단가기준])+'</span>' : esc(r[I.단가기준]||"")}</td>
+<td>${valCell(r)}</td>
+<td class="l why">${esc(r[I.근거]||"")}</td>
+</tr>`;}).join("")||`<tr><td colspan="${COLS.length}" class="l muted" style="padding:26px">조건에 맞는 부품이 없습니다.</td></tr>`;
+  const nw=a.reduce((x,r)=>x+(r[I.재산정평가액]||0),0);
+  const no=a.filter(r=>r[I.적용단가]==null).length;
+  document.getElementById("cnt").innerHTML=
+    `${nf(a.length)}개 · 재고 ${nf(a.reduce((x,r)=>x+r[I.현재고수량],0))}개 · `+
+    `평가액 ${nf(nw)}원`+(no?` · 단가 없어 미평가 ${nf(no)}개`:"")+
+    ` · ${page+1}/${np} 쪽`;
+  document.getElementById("prev").disabled=page<=0;
+  document.getElementById("next").disabled=page>=np-1;
+  head();
+}
+
+/* 필터 채우기 */
+{
+  const c=R.reduce((a,r)=>{const b=r[I.지점]; if(b)a[b]=(a[b]||0)+1; return a;},{});
+  const sel=document.getElementById("br");
+  sel.innerHTML=`<option value="">전체</option>`+
+    BRS.map(b=>`<option value="${esc(b)}">${esc(b)} (${nf(c[b]||0)})</option>`).join("");
+  sel.onchange=e=>{br=e.target.value;page=0;draw();};
+  if(BRS.length<2) document.getElementById("brfld").style.display="none";
+}
+const mkCount=R.reduce((a,r)=>{const m=r[I.메이커]; if(m)a[m]=(a[m]||0)+1; return a;},{});
+document.getElementById("mk").innerHTML=`<option value="">전체</option>`+
+  Object.entries(mkCount).sort((a,b)=>b[1]-a[1])
+    .map(([m,c])=>`<option value="${esc(m)}">${esc(m)} (${nf(c)})</option>`).join("");
+document.getElementById("gchips").innerHTML=LISTG.map(g=>
+  `<button class="chip" type="button" aria-pressed="true" data-g="${g}"><i class="dot" style="background:${GC[g]}"></i>${g}</button>`).join("");
+document.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{
+  const g=b.dataset.g,on=b.getAttribute("aria-pressed")==="true";
+  b.setAttribute("aria-pressed",String(!on));
+  if(on) gsel.delete(g); else gsel.add(g);
+  page=0; draw();});
+document.getElementById("q").oninput=e=>{q=e.target.value.trim().toLowerCase();page=0;draw();};
+document.getElementById("mk").onchange=e=>{mk=e.target.value;page=0;draw();};
+document.getElementById("sc").onchange=e=>{sc=e.target.value;page=0;draw();};
+document.getElementById("pp").onchange=()=>{page=0;draw();};
+document.getElementById("prev").onclick=()=>{if(page>0){page--;draw();}};
+document.getElementById("next").onclick=()=>{page++;draw();};
+document.getElementById("thm").onclick=()=>{
+  const cur=document.documentElement.getAttribute("data-theme");
+  const dark=cur?cur==="dark":matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.setAttribute("data-theme",dark?"light":"dark");};
+
+document.getElementById("csv").onclick=()=>{
+  const h=["지점","품번","부품명","메이커","등급","재고수량","원가확인수량","원가미상수량",
+           "현행매입단가","센터가","할인율(%)","재산정단가","적용단가","단가기준","평가액","현행산출근거"];
+  const cq=v=>{const s=v==null?"":String(v);return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+  const lines=[h.join(",")].concat(filtered().map(r=>[
+    r[I.지점],r[0],r[I.부품명],r[I.메이커],r[I.등급],r[I.현재고수량],
+    r[I.원가확인수량],r[I.원가미상수량],r[I.매입단가],
+    r[I.센터가],r[I.할인율],r[I.재산정단가],r[I.적용단가],r[I.단가기준],
+    r[I.재산정평가액],r[I.근거]].map(cq).join(",")));
+  const b=new Blob(["﻿"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(b);
+  a.download=`센터가재산정_${S.기준일}.csv`;a.click();URL.revokeObjectURL(a.href);};
+
+document.getElementById("cautions").innerHTML=
+  `<strong>이 페이지의 값을 그대로 반영하기 전에</strong><br>
+   · 센터가는 <strong>매입가가 아니라 정가 성격</strong>입니다. 할인율을 곱해 매입가에 가깝게 만든 <em>추정치</em>이고,
+     실제 매입 기록이 아닙니다. A·B 등급처럼 확정값으로 다루지 마세요.<br>
+   · <strong>센터가는 시점 복원이 안 됩니다.</strong> 부품마스터의 현재값이라 추출한 날 기준입니다.<br>
+   · 산출 못한 ${nf(RC.재산정불가)}개 — 센터가 없음 ${nf(RC.불가사유["센터가 없음"]||0)}개 ·
+     할인율 미등록 ${nf(RC.불가사유["할인율 미등록"]||0)}개. 이들은 여전히 외부 가격표가 필요합니다.<br>
+   · <strong>D등급</strong>은 이미 판매가 역산 추정치였습니다. 센터가 재산정으로 바꾸면
+     추정 방식이 달라지는 것이지 확정되는 것이 아닙니다.`;
+
+document.getElementById("listh").textContent=
+  `부품 목록 — 재산정 대상 ${TG.join("·")} ${nf(R.filter(r=>r[I.재산정대상]==="Y").length)}개 `
+  +`· 확정 ${KEEP.join("·")} ${nf(R.filter(r=>r[I.재산정대상]!=="Y").length)}개 (참고)`;
+document.getElementById("meta").textContent=
+  `대상 ${nf(RC.대상부품)}개 · 산출 ${nf(RC.재산정가능)}개 · 기준일 ${S.기준일}`;
+draw();
+</script>
+</body>
+</html>

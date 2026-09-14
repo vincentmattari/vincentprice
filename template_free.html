@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>무상 부품리스트 대조</title>
+<style>
+:root{
+  color-scheme: light;
+  --surface-1:#fcfcfb; --plane:#f9f9f7;
+  --ink-1:#0b0b0b; --ink-2:#52514e; --ink-3:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
+  --g-a:#0ca30c; --g-b:#2a78d6; --g-c:#c98500; --g-d:#d03b3b; --g-f:#898781; --g-n:#4a3aa7; --g-g:#eb6834;
+  --accent:#2a78d6; --ok:#0ca30c; --bad:#d03b3b;
+}
+@media (prefers-color-scheme: dark){:root:where(:not([data-theme="light"])){
+  color-scheme: dark;
+  --surface-1:#1a1a19; --plane:#0d0d0d;
+  --ink-1:#fff; --ink-2:#c3c2b7; --ink-3:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --g-a:#0ca30c; --g-b:#3987e5; --g-c:#c98500; --g-d:#d03b3b; --g-f:#898781; --g-n:#9085e9; --g-g:#d95926;
+  --accent:#3987e5; --ok:#0ca30c; --bad:#d03b3b;
+}}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --surface-1:#1a1a19; --plane:#0d0d0d;
+  --ink-1:#fff; --ink-2:#c3c2b7; --ink-3:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --g-a:#0ca30c; --g-b:#3987e5; --g-c:#c98500; --g-d:#d03b3b; --g-f:#898781; --g-n:#9085e9; --g-g:#d95926;
+  --accent:#3987e5; --ok:#0ca30c; --bad:#d03b3b;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink-1);
+  font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic",sans-serif;
+  font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1900px;margin:0 auto;padding:28px 20px 80px;position:relative}
+h1{font-size:26px;line-height:1.25;margin:0 0 6px;letter-spacing:-.02em;max-width:80ch}
+h2{font-size:17px;margin:0 0 14px;letter-spacing:-.01em}
+.sub{color:var(--ink-2);margin:0 0 24px;max-width:80ch}
+.card{background:var(--surface-1);border:1px solid var(--ring);border-radius:12px;padding:20px;margin-bottom:18px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:12px;margin-bottom:18px}
+.tile{background:var(--surface-1);border:1px solid var(--ring);border-radius:12px;padding:16px 18px}
+.tile .k{font-size:12px;color:var(--ink-2);margin-bottom:6px}
+.tile .v{font-size:26px;font-weight:640;letter-spacing:-.02em;line-height:1.15}
+.tile .n{font-size:11.5px;color:var(--ink-3);margin-top:4px}
+.tile.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 7%,transparent)}
+.tile.bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 7%,transparent)}
+/* 등급 분포 */
+.gchart{display:grid;grid-template-columns:auto 1fr auto;gap:9px 12px;align-items:center;max-width:860px}
+.gchart .gl{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+.gchart .gl b{color:var(--ink-1);font-size:13px;width:12px;display:inline-block}
+.gtrack{background:var(--grid);border-radius:4px;height:20px;overflow:hidden}
+.gtrack i{display:block;height:100%;border-radius:0 4px 4px 0}
+.gval{font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink-1);font-weight:620;white-space:nowrap}
+.gval span{color:var(--ink-3);font-weight:400;margin-left:5px}
+.dot{width:9px;height:9px;border-radius:2px;flex:none}
+.ctrls{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end}
+.ctrls.stick{position:sticky;top:0;z-index:7;background:var(--surface-1);
+  padding:14px 0 13px;border-bottom:1px solid var(--grid)}
+.fld{display:flex;flex-direction:column;gap:5px}
+.fld label{font-size:11.5px;color:var(--ink-2);font-weight:560}
+input[type=search],select{background:var(--plane);color:var(--ink-1);border:1px solid var(--axis);
+  border-radius:7px;padding:7px 10px;font:inherit;font-size:13px;min-width:150px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--axis);background:var(--plane);color:var(--ink-2);border-radius:999px;
+  padding:5px 11px;font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit}
+.chip[aria-pressed=true]{border-color:var(--accent);color:var(--ink-1);
+  background:color-mix(in srgb,var(--accent) 12%,transparent);font-weight:600}
+.btn{border:1px solid var(--axis);background:var(--plane);color:var(--ink-1);border-radius:7px;
+  padding:8px 14px;font:inherit;font-size:13px;font-weight:560;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.tblwrap{overflow:auto;max-height:calc(100vh - 210px);
+  border:1px solid var(--ring);border-radius:12px;background:var(--surface-1)}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+th,td{padding:7px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--grid)}
+th{position:sticky;top:0;background:var(--surface-1);color:var(--ink-2);font-size:11.5px;font-weight:620;
+  text-align:right;cursor:pointer;user-select:none;z-index:3;
+  box-shadow:inset 0 -1px var(--axis), 0 1px 0 var(--axis)}
+th:hover{color:var(--ink-1)}
+th.l,td.l{text-align:left}
+td{font-variant-numeric:tabular-nums;color:var(--ink-2)}
+td.pn{font-family:ui-monospace,Consolas,monospace;color:var(--ink-1);font-size:12.5px}
+a.plink{color:var(--ink-1);text-decoration:none;border-bottom:1px dotted var(--axis)}
+a.plink:hover{color:var(--accent);border-bottom-color:var(--accent)}
+td.nm{color:var(--ink-1);max-width:180px;overflow:hidden;text-overflow:ellipsis}
+td.rs{color:var(--ink-3);max-width:230px;overflow:hidden;text-overflow:ellipsis;font-size:11.5px}
+td.hero{color:var(--ink-1);font-weight:650}
+tbody tr:hover{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+tbody tr.mis{background:color-mix(in srgb,var(--bad) 6%,transparent)}
+tbody tr.agree{background:color-mix(in srgb,var(--ok) 5%,transparent)}
+.gb{display:inline-flex;align-items:center;gap:5px;font-weight:640;font-size:12px;color:var(--ink-1)}
+.tag{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:620}
+.tag.y{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.tag.n{background:var(--grid);color:var(--ink-3)}
+.tag.m{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+.muted{color:var(--ink-3)}
+.foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;
+  padding:12px 4px;font-size:12.5px;color:var(--ink-2)}
+.note{border-left:3px solid var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent);
+  border-radius:7px;padding:12px 15px;margin:14px 0;font-size:13px;color:var(--ink-2)}
+.note strong{color:var(--ink-1)}
+.warnbox{border-left:3px solid var(--bad);background:color-mix(in srgb,var(--bad) 8%,transparent);
+  border-radius:7px;padding:12px 15px;margin:14px 0;font-size:13px;color:var(--ink-2)}
+.warnbox strong{color:var(--ink-1)}
+.nav{display:flex;gap:10px;margin-bottom:22px;flex-wrap:wrap}
+.thm{position:absolute;top:20px;right:20px}
+@media(max-width:640px){.wrap{padding:20px 13px 60px}h1{font-size:21px}.tile .v{font-size:22px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<button class="btn thm" id="thm" type="button">◐ 테마</button>
+
+<div class="nav">
+  <a class="btn" href="index.html">← 전체 매입단가</a>
+  <a class="btn" href="F등급_매입가.html">F등급 사유별 검토</a>
+  <a class="btn" href="매입단가_산출방법.html">산출 방법</a>
+</div>
+
+<h1>무상 부품리스트 대조</h1>
+<p class="sub">타 부서에서 <strong>무상으로 처리 중인 부품 목록</strong>과 이번 산출 등급을 대조합니다.
+목록에 있는데 우리가 원가를 매긴 부품은 <strong>둘 중 하나가 틀렸다는 뜻</strong>이므로 확인이 필요합니다.
+반대로 F등급이면서 목록에 있는 부품은 <strong>0원 처리 근거</strong>가 됩니다.</p>
+
+<div class="tiles" id="tiles"></div>
+
+<div class="card">
+  <h2>무상목록에 있는 부품의 산출 등급</h2>
+  <div class="gchart" id="gchart"></div>
+  <div class="note" id="gnote"></div>
+</div>
+
+<div class="card">
+  <h2>부품 목록</h2>
+  <div class="ctrls stick">
+    <div class="fld"><label for="q">품번 · 부품명 · 사유 검색</label>
+      <input type="search" id="q" placeholder="검색어" autocomplete="off"></div>
+    <div class="fld"><label for="cmp">대조 상태</label>
+      <select id="cmp">
+        <option value="unmatch" selected>불일치 — 목록에 있으나 원가 산정됨</option>
+        <option value="free">무상목록 포함 전체</option>
+        <option value="agree">일치 — 목록에 있고 N등급</option>
+        <option value="fcand">F등급 ∩ 무상목록 (0원 후보)</option>
+        <option value="notfree">무상목록에 없음</option>
+        <option value="">전체</option>
+      </select></div>
+    <div class="fld"><label for="st">재고</label>
+      <select id="st"><option value="Y" selected>재고 보유만</option>
+        <option value="">전체</option><option value="N">재고 없음</option></select></div>
+    <div class="fld"><label for="rg">사유 그룹</label><select id="rg"></select></div>
+    <div class="fld"><label for="mk">메이커</label><select id="mk"></select></div>
+    <div class="fld"><label>등급</label><div class="chips" id="gchips"></div></div>
+    <div class="fld"><label for="pp">표시 행수</label>
+      <select id="pp"><option>50</option><option selected>100</option><option>300</option><option value="99999">전체</option></select></div>
+    <button class="btn pri" id="csv" type="button">CSV 내려받기</button>
+  </div>
+  <div class="tblwrap">
+    <table><thead><tr id="thr"></tr></thead><tbody id="tb"></tbody></table>
+  </div>
+  <div class="foot"><span id="cnt"></span>
+    <span><button class="btn" id="prev" type="button">이전</button>
+    <span id="pg" style="margin:0 10px"></span>
+    <button class="btn" id="next" type="button">다음</button></span></div>
+</div>
+
+<div class="card">
+  <h2>확인 사항</h2>
+  <div class="warnbox" id="cautions"></div>
+</div>
+
+<p class="foot muted" id="meta"></p>
+</div>
+
+<script>
+const D = /*__DATA__*/;
+const F = D.fields, I = {};
+F.forEach((k,i)=>I[k]=i);
+const S = D.summary, R = D.items;
+/* 등급 표기 순서 — G(위탁재고)는 자사 재고가 아니므로 맨 뒤 */
+const GORD="ABCDNFG";
+const GC={A:"var(--g-a)",B:"var(--g-b)",C:"var(--g-c)",D:"var(--g-d)",N:"var(--g-n)",G:"var(--g-g)",F:"var(--g-f)"};
+const GN={A:"확정 — 교차검증됨",B:"확정 — 단일 매입",C:"일부 수량 원가 미상",
+          D:"추정 — 판매가 역산",N:"무상 입고 (원가 0)",G:"위탁재고 — 자사 매입 아님",F:"산출 불가 — 센터가 적용"};
+const nf=n=>n==null?"—":n.toLocaleString("ko-KR");
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+/* 재고 입출고 내역 화면 링크 */
+const LINKBASE="https://carang.ipartsnet.co.kr/epmsV3/stock/partStockStoreRelease.asp";
+const pnCell = r => {
+  const sn = r[I.재고번호];
+  const u = LINKBASE + "?keyword=" + encodeURIComponent(r[0]) + (sn!=null ? "&stockNo="+encodeURIComponent(sn) : "");
+  return `<a class="plink" href="${u}" target="_blank" rel="noopener" title="재고 입출고 내역 열기">${esc(r[0])}</a>`;
+};
+const isFree = r => r[I.무상목록]==="Y";
+const 매입 = r => r[I.매입단가] ?? r[I.센터가매입가] ?? null;
+
+let page=0, sortK="현재고수량", sortD=-1, q="", cmp="unmatch", st="Y",
+    rgf="", mk="", gsel=new Set(GORD.split(""));
+
+function tiles(){
+  const 재고=R.filter(r=>r[I.현재고수량]>0);
+  const f=재고.filter(isFree);
+  const agree=f.filter(r=>r[I.등급]==="N");
+  const mis=f.filter(r=>r[I.등급]!=="N");
+  const fc=f.filter(r=>r[I.등급]==="F");
+  const amt=mis.reduce((a,r)=>a+((매입(r)||0)*r[I.현재고수량]),0);
+  const t=[
+    ["무상목록 품번", nf(S.무상목록품번수)+"개", "중복 제외 · 외부 제공"],
+    ["재고 보유 중 일치", nf(f.length)+"개", "무상목록 ∩ 재고보유"],
+    ["일치 (N등급)", nf(agree.length)+"개", "양쪽 다 무상으로 판단", "ok"],
+    ["불일치", nf(mis.length)+"개", "목록엔 무상, 산출은 원가 있음", "bad"],
+    ["불일치 금액", nf(amt)+"원", "매입단가 × 재고수량"],
+    ["F등급 ∩ 무상목록", nf(fc.length)+"개", "0원 처리 근거 확보"],
+  ];
+  document.getElementById("tiles").innerHTML=t.map(([k,v,n,cl])=>
+    `<div class="tile${cl?" "+cl:""}"><div class="k">${k}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join("");
+}
+function gchart(){
+  const f=R.filter(r=>r[I.현재고수량]>0 && isFree(r));
+  const d={}; GORD.split("").forEach(g=>d[g]=f.filter(r=>r[I.등급]===g).length);
+  const mx=Math.max(...Object.values(d),1);
+  document.getElementById("gchart").innerHTML=GORD.split("").map(g=>
+    `<div class="gl"><i class="dot" style="background:${GC[g]}"></i><b>${g}</b>${GN[g]}</div>
+     <div class="gtrack"><i style="width:${100*d[g]/mx}%;background:${GC[g]}"></i></div>
+     <div class="gval">${nf(d[g])}개<span>${f.length?(100*d[g]/f.length).toFixed(1):0}%</span></div>`).join("");
+  const agree=d.N, mis=f.length-d.N;
+  document.getElementById("gnote").innerHTML=
+    `무상목록에 있고 재고를 보유한 부품 <strong>${nf(f.length)}개</strong> 중
+     <strong style="color:var(--ok)">${nf(agree)}개(${(100*agree/f.length).toFixed(1)}%)</strong>는 산출에서도 N(무상)으로 판단해 일치합니다.
+     나머지 <strong style="color:var(--bad)">${nf(mis)}개</strong>는 산출에서 원가가 확인되었거나 센터가를 적용한 건이라
+     <strong>어느 쪽이 맞는지 확인이 필요합니다.</strong>
+     이 중 F등급 <strong>${nf(d.F)}개</strong>는 원래 원가를 몰랐던 건이므로, 무상목록을 근거로 0원 처리할 수 있습니다.`;
+}
+const COLS=[["품번","l"],["부품명","l"],["메이커","l"],["현재고수량",""],["등급","l"],
+            ["무상목록","l"],["무상목록건수",""],["매입단가","h"],["센터가매입가",""],
+            ["사유그룹","l"],["대표사유","l"],["근거","l"]];
+function head(){
+  document.getElementById("thr").innerHTML=COLS.map(([k,c])=>
+    `<th class="${c==='l'?'l':''}" data-k="${k}">${k}${sortK===k?(sortD<0?" ▾":" ▴"):""}</th>`).join("");
+  document.querySelectorAll("th").forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k; if(sortK===k) sortD*=-1; else {sortK=k;sortD=-1;} page=0; draw();});
+}
+function filtered(){
+  let a=R.filter(r=>{
+    if(st==="Y" && !(r[I.현재고수량]>0)) return false;
+    if(st==="N" && r[I.현재고수량]>0) return false;
+    if(!gsel.has(r[I.등급])) return false;
+    if(cmp==="free"   && !isFree(r)) return false;
+    if(cmp==="agree"  && !(isFree(r) && r[I.등급]==="N")) return false;
+    if(cmp==="unmatch"&& !(isFree(r) && r[I.등급]!=="N")) return false;
+    if(cmp==="fcand"  && !(isFree(r) && r[I.등급]==="F")) return false;
+    if(cmp==="notfree"&& isFree(r)) return false;
+    if(rgf && (r[I.사유그룹]||"미기재")!==rgf) return false;
+    if(mk && r[I.메이커]!==mk) return false;
+    if(q && !(r[0].toLowerCase().includes(q)
+        || (r[I.부품명]||"").toLowerCase().includes(q)
+        || (r[I.대표사유]||"").toLowerCase().includes(q))) return false;
+    return true;});
+  a.sort((x,y)=>{
+    if(sortK==="매입단가") return ((매입(x)??-1)-(매입(y)??-1))*sortD;
+    if(["품번","부품명","메이커","등급","무상목록","사유그룹","대표사유","근거"].includes(sortK))
+      return String(x[I[sortK]]||"").localeCompare(String(y[I[sortK]]||""),"ko")*sortD;
+    return ((x[I[sortK]]??-1)-(y[I[sortK]]??-1))*sortD;});
+  return a;
+}
+function draw(){
+  const a=filtered(), pp=+document.getElementById("pp").value;
+  const np=Math.max(1,Math.ceil(a.length/pp)); page=Math.min(page,np-1);
+  document.getElementById("tb").innerHTML=a.slice(page*pp,(page+1)*pp).map(r=>{
+    const g=r[I.등급], fr=isFree(r);
+    const cls = fr ? (g==="N" ? "agree" : "mis") : "";
+    return `<tr class="${cls}">
+<td class="l pn">${pnCell(r)}</td>
+<td class="l nm">${r[I.부품명]?esc(r[I.부품명]):'<span class="muted">—</span>'}</td>
+<td class="l">${esc(r[I.메이커]||"")}</td>
+<td>${nf(r[I.현재고수량])}</td>
+<td class="l"><span class="gb"><i class="dot" style="background:${GC[g]}"></i>${g}</span></td>
+<td class="l">${fr?`<span class="tag ${g==="N"?"y":"m"}">무상</span>`:'<span class="tag n">—</span>'}</td>
+<td>${r[I.무상목록건수]?nf(r[I.무상목록건수]):'<span class="muted">0</span>'}</td>
+<td class="hero">${매입(r)==null?'<span class="muted">—</span>':nf(매입(r))}</td>
+<td>${nf(r[I.센터가매입가])}</td>
+<td class="l">${esc(r[I.사유그룹]||"")}</td>
+<td class="l rs" title="${esc(r[I.전체사유]||"")}">${r[I.대표사유]?esc(r[I.대표사유]):'<span class="muted">(빈칸)</span>'}</td>
+<td class="l rs" title="${esc(r[I.근거]||"")}">${esc(r[I.근거]||"")}</td>
+</tr>`;}).join("")||`<tr><td colspan="${COLS.length}" class="l muted" style="padding:26px">조건에 맞는 부품이 없습니다.</td></tr>`;
+  document.getElementById("cnt").textContent=`${nf(a.length)}개 (전체 ${nf(R.length)}개 중)`;
+  document.getElementById("pg").textContent=`${page+1} / ${np}`;
+  document.getElementById("prev").disabled=page===0;
+  document.getElementById("next").disabled=page>=np-1;
+  head();
+}
+document.getElementById("gchips").innerHTML=GORD.split("").map(g=>
+  `<button class="chip" type="button" aria-pressed="true" data-g="${g}"><i class="dot" style="background:${GC[g]}"></i>${g}</button>`).join("");
+document.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{
+  const g=b.dataset.g,on=b.getAttribute("aria-pressed")==="true";
+  b.setAttribute("aria-pressed",!on); on?gsel.delete(g):gsel.add(g); page=0; draw();});
+/* 사유 그룹 · 메이커 선택지는 재고 보유분 기준으로 만든다 */
+const 재고R = R.filter(r=>r[I.현재고수량]>0);
+const rgC = 재고R.reduce((a,r)=>{const g=r[I.사유그룹]||"미기재"; a[g]=(a[g]||0)+1; return a;},{});
+document.getElementById("rg").innerHTML=`<option value="">전체</option>`+
+  Object.entries(rgC).sort((a,b)=>b[1]-a[1])
+    .map(([g,c])=>`<option value="${esc(g)}">${esc(g)} (${c})</option>`).join("");
+const mkC = 재고R.reduce((a,r)=>{const m=r[I.메이커]; if(m) a[m]=(a[m]||0)+1; return a;},{});
+document.getElementById("mk").innerHTML=`<option value="">전체</option>`+
+  Object.entries(mkC).sort((a,b)=>b[1]-a[1])
+    .map(([m,c])=>`<option value="${esc(m)}">${esc(m)} (${c})</option>`).join("");
+document.getElementById("rg").onchange=e=>{rgf=e.target.value;page=0;draw();};
+document.getElementById("mk").onchange=e=>{mk=e.target.value;page=0;draw();};
+document.getElementById("q").oninput=e=>{q=e.target.value.trim().toLowerCase();page=0;draw();};
+document.getElementById("cmp").onchange=e=>{cmp=e.target.value;page=0;draw();};
+document.getElementById("st").onchange=e=>{st=e.target.value;page=0;draw();};
+document.getElementById("pp").onchange=()=>{page=0;draw();};
+document.getElementById("prev").onclick=()=>{page--;draw();scrollTo({top:document.querySelector(".tblwrap").offsetTop-70,behavior:"smooth"});};
+document.getElementById("next").onclick=()=>{page++;draw();scrollTo({top:document.querySelector(".tblwrap").offsetTop-70,behavior:"smooth"});};
+document.getElementById("thm").onclick=()=>{
+  const cur=document.documentElement.getAttribute("data-theme");
+  const dark=cur?cur==="dark":matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.setAttribute("data-theme",dark?"light":"dark");};
+document.getElementById("csv").onclick=()=>{
+  const h=["품번","부품명","메이커","현재고수량","등급","무상목록","무상목록건수",
+           "매입단가","센터가매입가","사유그룹","대표사유","전체사유","근거","대조상태"];
+  const cq=v=>{const s=v==null?"":String(v);return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+  const stat=r=>!isFree(r)?"목록없음":(r[I.등급]==="N"?"일치":"불일치");
+  const lines=[h.join(",")].concat(filtered().map(r=>[
+    r[0],r[I.부품명],r[I.메이커],r[I.현재고수량],r[I.등급],r[I.무상목록],r[I.무상목록건수],
+    매입(r),r[I.센터가매입가],r[I.사유그룹],r[I.대표사유],r[I.전체사유],r[I.근거],stat(r)
+  ].map(cq).join(",")));
+  const b=new Blob(["﻿"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(b);
+  a.download=`무상목록_대조_${S.기준일}.csv`;a.click();URL.revokeObjectURL(a.href);};
+(function(){
+  const 재고=R.filter(r=>r[I.현재고수량]>0);
+  const f=재고.filter(isFree);
+  const mis=f.filter(r=>r[I.등급]!=="N");
+  const onlyOurs=재고.filter(r=>r[I.등급]==="N" && !isFree(r));
+  document.getElementById("cautions").innerHTML=
+    `<strong>대조는 품번만으로 합니다.</strong> 무상목록에 메이커·수량·일자가 없어 같은 품번이면 같은 건으로 봅니다.<br>
+     · 무상목록은 <strong>중복 포함 ${nf(S.무상목록행수||0)}행 / 고유 ${nf(S.무상목록품번수)}품번</strong>입니다. 중복은 출고 건수로 보입니다.<br>
+     · <strong>불일치 ${nf(mis.length)}개</strong> — 산출에서는 매입 단가가 확인된 건입니다.
+       실제로 무상이었다면 과거 입고 단가가 잘못 입력된 것이고, 반대면 무상목록이 과다합니다.<br>
+     · 산출에서 N(무상)으로 본 부품 중 무상목록에 없는 건은 <strong>${nf(onlyOurs.length)}개</strong>입니다.<br>
+     · 무상목록은 <strong>2026년 6월 기준</strong>이고 산출은 <strong>${S.기준일}</strong> 기준이라 시점 차이가 있습니다.`;
+})();
+document.getElementById("meta").textContent=
+  `무상목록 ${nf(S.무상목록품번수)}품번 대조 · 산출 부품 ${nf(R.length)}개 · 생성 ${S.기준일}`;
+tiles(); gchart(); draw();
+</script>
+</body>
+</html>

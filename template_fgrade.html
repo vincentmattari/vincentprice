@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F등급 매입가 — 발생사유별 검토</title>
+<style>
+:root{
+  color-scheme: light;
+  --surface-1:#fcfcfb; --plane:#f9f9f7;
+  --ink-1:#0b0b0b; --ink-2:#52514e; --ink-3:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
+  --accent:#2a78d6; --free:#0ca30c; --warn:#d03b3b;
+}
+@media (prefers-color-scheme: dark){:root:where(:not([data-theme="light"])){
+  color-scheme: dark;
+  --surface-1:#1a1a19; --plane:#0d0d0d;
+  --ink-1:#fff; --ink-2:#c3c2b7; --ink-3:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --accent:#3987e5; --free:#0ca30c; --warn:#d03b3b;
+}}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --surface-1:#1a1a19; --plane:#0d0d0d;
+  --ink-1:#fff; --ink-2:#c3c2b7; --ink-3:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --accent:#3987e5; --free:#0ca30c; --warn:#d03b3b;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink-1);
+  font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic",sans-serif;
+  font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1900px;margin:0 auto;padding:28px 20px 80px;position:relative}
+h1{font-size:26px;line-height:1.25;margin:0 0 6px;letter-spacing:-.02em;max-width:80ch}
+h2{font-size:17px;margin:0 0 14px;letter-spacing:-.01em}
+.sub{color:var(--ink-2);margin:0 0 24px;max-width:80ch}
+.card{background:var(--surface-1);border:1px solid var(--ring);border-radius:12px;padding:20px;margin-bottom:18px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:12px;margin-bottom:18px}
+.tile{background:var(--surface-1);border:1px solid var(--ring);border-radius:12px;padding:16px 18px}
+.tile .k{font-size:12px;color:var(--ink-2);margin-bottom:6px}
+.tile .v{font-size:26px;font-weight:640;letter-spacing:-.02em;line-height:1.15}
+.tile .n{font-size:11.5px;color:var(--ink-3);margin-top:4px}
+.tile.on{border-color:var(--free);background:color-mix(in srgb,var(--free) 7%,transparent)}
+/* 사유 그룹 */
+.rg{display:grid;grid-template-columns:auto auto 1fr auto auto;gap:8px 12px;align-items:center}
+.rg-h{font-size:11.5px;color:var(--ink-3);font-weight:620;padding-bottom:4px;border-bottom:1px solid var(--grid)}
+.rg-h:nth-child(-n+5){margin-bottom:2px}
+.rg label{display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;color:var(--ink-1);
+  font-weight:560;white-space:nowrap}
+.rg input[type=checkbox]{width:16px;height:16px;accent-color:var(--free);cursor:pointer;flex:none}
+.rg .cnt{font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+.rg .bar{background:var(--grid);border-radius:4px;height:16px;overflow:hidden;min-width:60px}
+.rg .bar i{display:block;height:100%;background:var(--accent);border-radius:0 4px 4px 0}
+.rg .amt{font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink-1);
+  font-weight:620;white-space:nowrap;text-align:right}
+.rg .ex{font-size:11.5px;color:var(--ink-3);max-width:340px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.rg-row.on label,.rg-row.on .amt{color:var(--free)}
+.ctrls{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end}
+.ctrls.stick{position:sticky;top:0;z-index:7;background:var(--surface-1);
+  padding:14px 0 13px;border-bottom:1px solid var(--grid)}
+.fld{display:flex;flex-direction:column;gap:5px}
+.fld label{font-size:11.5px;color:var(--ink-2);font-weight:560}
+input[type=search],select{background:var(--plane);color:var(--ink-1);border:1px solid var(--axis);
+  border-radius:7px;padding:7px 10px;font:inherit;font-size:13px;min-width:150px}
+.btn{border:1px solid var(--axis);background:var(--plane);color:var(--ink-1);border-radius:7px;
+  padding:8px 14px;font:inherit;font-size:13px;font-weight:560;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.tblwrap{overflow:auto;max-height:calc(100vh - 210px);
+  border:1px solid var(--ring);border-radius:12px;background:var(--surface-1)}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+th,td{padding:7px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--grid)}
+th{position:sticky;top:0;background:var(--surface-1);color:var(--ink-2);font-size:11.5px;font-weight:620;
+  text-align:right;cursor:pointer;user-select:none;z-index:3;
+  box-shadow:inset 0 -1px var(--axis), 0 1px 0 var(--axis)}
+th:hover{color:var(--ink-1)}
+th.l,td.l{text-align:left}
+td{font-variant-numeric:tabular-nums;color:var(--ink-2)}
+td.pn{font-family:ui-monospace,Consolas,monospace;color:var(--ink-1);font-size:12.5px}
+a.plink{color:var(--ink-1);text-decoration:none;border-bottom:1px dotted var(--axis)}
+a.plink:hover{color:var(--accent);border-bottom-color:var(--accent)}
+td.nm{color:var(--ink-1);max-width:190px;overflow:hidden;text-overflow:ellipsis}
+td.rs{color:var(--ink-2);max-width:280px;overflow:hidden;text-overflow:ellipsis;font-size:12px}
+td.hero{color:var(--ink-1);font-weight:650}
+td.zero{color:var(--free);font-weight:650}
+tbody tr.freed{background:color-mix(in srgb,var(--free) 6%,transparent)}
+tbody tr:hover{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.muted{color:var(--ink-3)}
+.foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;
+  padding:12px 4px;font-size:12.5px;color:var(--ink-2)}
+.note{border-left:3px solid var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent);
+  border-radius:7px;padding:12px 15px;margin:14px 0;font-size:13px;color:var(--ink-2)}
+.note strong{color:var(--ink-1)}
+.warnbox{border-left:3px solid var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent);
+  border-radius:7px;padding:12px 15px;margin:14px 0;font-size:13px;color:var(--ink-2)}
+.warnbox strong{color:var(--ink-1)}
+.nav{display:flex;gap:10px;margin-bottom:22px}
+.thm{position:absolute;top:20px;right:20px}
+@media(max-width:640px){.wrap{padding:20px 13px 60px}h1{font-size:21px}
+  .rg{grid-template-columns:auto 1fr auto}.rg .bar,.rg .ex{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<button class="btn thm" id="thm" type="button">◐ 테마</button>
+
+<div class="nav">
+  <a class="btn" href="index.html">← 전체 매입단가</a>
+  <a class="btn" href="매입단가_산출방법.html">산출 방법</a>
+</div>
+
+<h1>F등급 매입가 — 발생사유별 검토</h1>
+<p class="sub">매입·판매 단가가 모두 없어 <strong>센터가 × 메이커 할인율</strong>로 매입가를 산출한 부품입니다.
+다만 이 중에는 <strong>무상으로 받아 원가가 0원인 건</strong>이 섞여 있을 수 있습니다.
+아래에서 <strong>사유 그룹을 체크하면 해당 부품의 매입가가 0원으로 바뀝니다.</strong>
+확인 후 다운로드하세요.</p>
+
+<div class="tiles" id="tiles"></div>
+
+<div class="card">
+  <h2>발생사유 그룹 — 체크하면 0원 처리</h2>
+  <p style="color:var(--ink-2);margin:0 0 14px;font-size:13px">
+    사유는 <strong>가장 최근 입고</strong> 기준입니다. 지금 남아 있는 재고가 들어온 경위에 해당합니다.</p>
+  <div class="rg" id="rg"></div>
+  <div class="note" id="rgnote"></div>
+</div>
+
+<div class="card">
+  <h2>부품 목록</h2>
+  <div class="ctrls stick">
+    <div class="fld"><label for="q">품번 · 부품명 · 사유 검색</label>
+      <input type="search" id="q" placeholder="검색어" autocomplete="off"></div>
+    <div class="fld" id="brfld"><label for="br">지점</label><select id="br"></select></div>
+    <div class="fld"><label for="mk">메이커</label><select id="mk"></select></div>
+    <div class="fld"><label for="gf">사유 그룹</label><select id="gf"></select></div>
+    <div class="fld"><label for="zf">0원 처리</label>
+      <select id="zf"><option value="">전체</option>
+        <option value="Y">0원 적용분만</option>
+        <option value="N">센터가 적용분만</option></select></div>
+    <div class="fld"><label for="pp">표시 행수</label>
+      <select id="pp"><option>50</option><option selected>100</option><option>300</option><option value="99999">전체</option></select></div>
+    <button class="btn pri" id="csv" type="button">CSV 내려받기</button>
+  </div>
+  <div class="tblwrap">
+    <table><thead><tr id="thr"></tr></thead><tbody id="tb"></tbody></table>
+  </div>
+  <div class="foot"><span id="cnt"></span>
+    <span><button class="btn" id="prev" type="button">이전</button>
+    <span id="pg" style="margin:0 10px"></span>
+    <button class="btn" id="next" type="button">다음</button></span></div>
+</div>
+
+<div class="card">
+  <h2>확인 사항</h2>
+  <div class="warnbox">
+    <strong>사유만으로 무상 여부를 단정할 수 없습니다.</strong><br>
+    · <strong>미기재</strong>가 가장 많습니다. 사유가 비어 있어 판단 근거가 없습니다.<br>
+    · <strong>재고조사</strong>는 실사에서 발견된 재고입니다. 원가를 모를 뿐 무상이라는 뜻은 아닙니다.<br>
+    · <strong>매입·픽업</strong>은 돈을 주고 산 건이므로 0원 처리 대상이 아닙니다.<br>
+    · <strong>회수</strong>는 협력사에서 미사용 부품을 받아온 건으로, 무상일 가능성이 있으나 확인이 필요합니다.<br>
+    · 0원으로 처리하면 해당 재고의 자산가치가 0이 됩니다. 판매 시 전액이 이익으로 잡힙니다.
+  </div>
+</div>
+
+<p class="foot muted" id="meta"></p>
+</div>
+
+<script>
+const D = /*__DATA__*/;
+const F = D.fields, I = {};
+F.forEach((k,i)=>I[k]=i);
+const S = D.summary;
+const R = D.items.filter(r=>r[I.현재고수량]>0 && r[I.등급]==="F");
+const nf=n=>n==null?"—":n.toLocaleString("ko-KR");
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+/* 재고 입출고 내역 화면 링크 */
+const LINKBASE="https://carang.ipartsnet.co.kr/epmsV3/stock/partStockStoreRelease.asp";
+const pnCell = r => {
+  const sn = r[I.재고번호];
+  const u = LINKBASE + "?keyword=" + encodeURIComponent(r[0]) + (sn!=null ? "&stockNo="+encodeURIComponent(sn) : "");
+  return `<a class="plink" href="${u}" target="_blank" rel="noopener" title="재고 입출고 내역 열기">${esc(r[0])}</a>`;
+};
+
+/* 기본 체크: 무상 의미가 분명한 그룹만 */
+const FREE_DEFAULT = new Set(["무상지원"]);
+const groups = {};
+R.forEach(r=>{
+  const g = r[I.사유그룹] || "미기재";
+  (groups[g] = groups[g] || {n:0, qty:0, amt:0, ex:new Set()});
+  groups[g].n++; groups[g].qty += r[I.현재고수량];
+  groups[g].amt += (r[I.센터가매입가]||0);
+  if(r[I.대표사유]) groups[g].ex.add(r[I.대표사유]);
+});
+const zeroed = new Set(FREE_DEFAULT);
+const isZero = r => zeroed.has(r[I.사유그룹] || "미기재");
+const applied = r => isZero(r) ? 0 : (r[I.센터가매입가] ?? null);
+
+let page=0, sortK="센터가매입가", sortD=-1, q="", mk="", gf="", zf="", br="";
+
+function tiles(){
+  const z = R.filter(isZero);
+  const amt = R.reduce((a,r)=>a+(applied(r)||0),0);
+  const base = R.reduce((a,r)=>a+(r[I.센터가매입가]||0),0);
+  const t=[
+    ["F등급 부품", nf(R.length)+"개", "재고 "+nf(R.reduce((a,r)=>a+r[I.현재고수량],0))+"개"],
+    ["0원 처리", nf(z.length)+"개", z.length?("사유 "+[...zeroed].join(" · ")):"선택 없음"],
+    ["센터가 기준 합계", nf(base)+"원", "할인율 적용 후"],
+    ["적용 매입가 합계", nf(amt)+"원", "0원 처리 반영"],
+    ["차감액", "−"+nf(base-amt)+"원", base?((100*(base-amt)/base).toFixed(1)+"% 감소"):"—"],
+  ];
+  const el=document.getElementById("tiles");
+  el.innerHTML=t.map(([k,v,n],i)=>
+    `<div class="tile${i===1&&z.length?" on":""}"><div class="k">${k}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join("");
+}
+function rg(){
+  const keys=Object.keys(groups).sort((a,b)=>groups[b].n-groups[a].n);
+  const mx=Math.max(...keys.map(k=>groups[k].n),1);
+  const head=["0원","사유 그룹","","금액","예시"];
+  document.getElementById("rg").innerHTML =
+    head.map(h=>`<div class="rg-h">${h}</div>`).join("") +
+    keys.map(k=>{
+      const g=groups[k], on=zeroed.has(k);
+      return `<div class="rg-row${on?" on":""}" style="display:contents">
+        <label><input type="checkbox" data-g="${esc(k)}" ${on?"checked":""}></label>
+        <label for=""><span>${esc(k)}</span></label>
+        <div class="bar"><i style="width:${100*g.n/mx}%"></i></div>
+        <div class="amt">${nf(g.n)}개 · ${nf(g.amt)}원</div>
+        <div class="ex" title="${esc([...g.ex].join(' / '))}">${esc([...g.ex].slice(0,3).join(" / ")||"—")}</div>
+      </div>`;}).join("");
+  document.querySelectorAll('#rg input[type=checkbox]').forEach(c=>c.onchange=()=>{
+    c.checked ? zeroed.add(c.dataset.g) : zeroed.delete(c.dataset.g);
+    tiles(); rg(); draw();});
+  const z=R.filter(isZero);
+  document.getElementById("rgnote").innerHTML = z.length
+    ? `<strong>${nf(z.length)}개 부품이 매입가 0원으로 처리됩니다.</strong>
+       센터가 기준 ${nf(z.reduce((a,r)=>a+(r[I.센터가매입가]||0),0))}원이 0원이 됩니다.`
+    : `현재 <strong>0원 처리된 그룹이 없습니다.</strong> 위에서 무상으로 판단되는 사유를 체크하세요.`;
+}
+const COLS=[["품번","l"],["지점","l"],["부품명","l"],["메이커","l"],["현재고수량",""],
+            ["대표사유","l"],["사유그룹","l"],["센터가",""],["할인율",""],
+            ["센터가매입가",""],["적용매입가","h"],["평균입고경과일",""],["최종이동일","l"]];
+function head(){
+  document.getElementById("thr").innerHTML=COLS.map(([k,c])=>
+    `<th class="${c==='l'?'l':''}" data-k="${k}">${k}${sortK===k?(sortD<0?" ▾":" ▴"):""}</th>`).join("");
+  document.querySelectorAll("th").forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k; if(sortK===k) sortD*=-1; else {sortK=k;sortD=-1;} page=0; draw();});
+}
+function filtered(){
+  let a=R.filter(r=>
+    (!br || r[I.지점]===br)
+    && (!mk || r[I.메이커]===mk)
+    && (!gf || (r[I.사유그룹]||"미기재")===gf)
+    && (!zf || (zf==="Y" ? isZero(r) : !isZero(r)))
+    && (!q || r[0].toLowerCase().includes(q)
+          || (r[I.부품명]||"").toLowerCase().includes(q)
+          || (r[I.대표사유]||"").toLowerCase().includes(q)));
+  a.sort((x,y)=>{
+    if(sortK==="적용매입가") return ((applied(x)??-1)-(applied(y)??-1))*sortD;
+    if(["품번","부품명","메이커","대표사유","사유그룹","최종이동일"].includes(sortK))
+      return String(x[I[sortK]]||"").localeCompare(String(y[I[sortK]]||""),"ko")*sortD;
+    return ((x[I[sortK]]??-1)-(y[I[sortK]]??-1))*sortD;});
+  return a;
+}
+function draw(){
+  const a=filtered(), pp=+document.getElementById("pp").value;
+  const np=Math.max(1,Math.ceil(a.length/pp)); page=Math.min(page,np-1);
+  document.getElementById("tb").innerHTML=a.slice(page*pp,(page+1)*pp).map(r=>{
+    const z=isZero(r), ap=applied(r);
+    return `<tr class="${z?"freed":""}">
+<td class="l pn">${pnCell(r)}</td>
+<td class="l">${esc(r[I.지점]||"")}</td>
+<td class="l nm">${r[I.부품명]?esc(r[I.부품명]):'<span class="muted">—</span>'}</td>
+<td class="l">${esc(r[I.메이커]||"")}</td>
+<td>${nf(r[I.현재고수량])}</td>
+<td class="l rs" title="${esc(r[I.전체사유]||"")}">${r[I.대표사유]?esc(r[I.대표사유]):'<span class="muted">(빈칸)</span>'}</td>
+<td class="l">${esc(r[I.사유그룹]||"")}</td>
+<td>${nf(r[I.센터가])}</td>
+<td>${r[I.할인율]==null?"—":r[I.할인율]+"%"}</td>
+<td>${nf(r[I.센터가매입가])}</td>
+<td class="${z?"zero":"hero"}">${z?"0":nf(ap)}</td>
+<td>${nf(r[I.평균입고경과일])}</td>
+<td class="l">${r[I.최종이동일]||'<span class="muted">—</span>'}</td>
+</tr>`;}).join("")||`<tr><td colspan="${COLS.length}" class="l muted" style="padding:26px">조건에 맞는 부품이 없습니다.</td></tr>`;
+  document.getElementById("cnt").textContent=`${nf(a.length)}개 (F등급 ${nf(R.length)}개 중)`;
+  document.getElementById("pg").textContent=`${page+1} / ${np}`;
+  document.getElementById("prev").disabled=page===0;
+  document.getElementById("next").disabled=page>=np-1;
+  head();
+}
+const mkC=R.reduce((a,r)=>{const m=r[I.메이커]; if(m)a[m]=(a[m]||0)+1; return a;},{});
+document.getElementById("mk").innerHTML=`<option value="">전체</option>`+
+  Object.entries(mkC).sort((a,b)=>b[1]-a[1]).map(([m,c])=>`<option value="${esc(m)}">${esc(m)} (${c})</option>`).join("");
+document.getElementById("gf").innerHTML=`<option value="">전체</option>`+
+  Object.keys(groups).sort((a,b)=>groups[b].n-groups[a].n)
+    .map(g=>`<option value="${esc(g)}">${esc(g)} (${groups[g].n})</option>`).join("");
+document.getElementById("q").oninput=e=>{q=e.target.value.trim().toLowerCase();page=0;draw();};
+/* 지점 — 성수·광주는 별개 DB 다. 지점이 하나뿐이면 필터를 숨긴다. */
+{
+  /* 지점 순서는 데이터 등장 순이 아니라 산출 스크립트가 정한 순서(BRANCHES)를 따른다.
+     등장 순으로 잡으면 재고평가액이 큰 지점이 앞으로 와 회차마다 순서가 바뀐다. */
+  const BRS=(S.지점목록||[]).filter(b=>R.some(r=>r[I.지점]===b))
+  .concat([...new Set(R.map(r=>r[I.지점]).filter(Boolean))]
+            .filter(b=>!(S.지점목록||[]).includes(b)));
+  const c=R.reduce((a,r)=>{const b=r[I.지점]; if(b)a[b]=(a[b]||0)+1; return a;},{});
+  const sel=document.getElementById("br");
+  sel.innerHTML=`<option value="">전체</option>`+
+    BRS.map(b=>`<option value="${esc(b)}">${esc(b)} (${nf(c[b]||0)})</option>`).join("");
+  sel.onchange=e=>{br=e.target.value;page=0;draw();};
+  if(BRS.length<2) document.getElementById("brfld").style.display="none";
+}
+document.getElementById("mk").onchange=e=>{mk=e.target.value;page=0;draw();};
+document.getElementById("gf").onchange=e=>{gf=e.target.value;page=0;draw();};
+document.getElementById("zf").onchange=e=>{zf=e.target.value;page=0;draw();};
+document.getElementById("pp").onchange=()=>{page=0;draw();};
+document.getElementById("prev").onclick=()=>{page--;draw();scrollTo({top:document.querySelector(".tblwrap").offsetTop-70,behavior:"smooth"});};
+document.getElementById("next").onclick=()=>{page++;draw();scrollTo({top:document.querySelector(".tblwrap").offsetTop-70,behavior:"smooth"});};
+document.getElementById("thm").onclick=()=>{
+  const cur=document.documentElement.getAttribute("data-theme");
+  const dark=cur?cur==="dark":matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.setAttribute("data-theme",dark?"light":"dark");};
+document.getElementById("csv").onclick=()=>{
+  const h=["품번","부품명","메이커","현재고수량","대표사유","사유그룹","전체사유",
+           "센터가","할인율(%)","센터가매입가","적용매입가","0원처리","할인율출처"];
+  const cq=v=>{const s=v==null?"":String(v);return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+  const lines=[h.join(",")].concat(filtered().map(r=>[
+    r[0],r[I.부품명],r[I.메이커],r[I.현재고수량],r[I.대표사유],r[I.사유그룹],r[I.전체사유],
+    r[I.센터가],r[I.할인율],r[I.센터가매입가],applied(r),isZero(r)?"Y":"N",r[I.할인율출처]
+  ].map(cq).join(",")));
+  const b=new Blob(["﻿"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(b);
+  a.download=`F등급_매입가_사유검토_${S.기준일}.csv`;a.click();URL.revokeObjectURL(a.href);};
+document.getElementById("meta").textContent=
+  `F등급 ${nf(R.length)}개 · 사유 그룹 ${Object.keys(groups).length}종 · 생성 ${S.기준일}`;
+tiles(); rg(); draw();
+</script>
+</body>
+</html>

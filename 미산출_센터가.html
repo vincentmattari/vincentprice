@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>미산출 사유 — 센터가 기준</title>
+<style>
+:root{
+  color-scheme: light;
+  --surface-1:#fcfcfb; --plane:#f9f9f7;
+  --ink-1:#0b0b0b; --ink-2:#52514e; --ink-3:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
+  --g-a:#0ca30c; --g-b:#2a78d6; --g-c:#c98500; --g-d:#d03b3b; --g-f:#898781; --g-n:#4a3aa7; --g-g:#eb6834;
+  --accent:#2a78d6;
+}
+@media (prefers-color-scheme: dark){:root:where(:not([data-theme="light"])){
+  color-scheme: dark;
+  --surface-1:#1a1a19; --plane:#0d0d0d;
+  --ink-1:#fff; --ink-2:#c3c2b7; --ink-3:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --g-a:#0ca30c; --g-b:#3987e5; --g-c:#c98500; --g-d:#d03b3b; --g-f:#898781; --g-n:#9085e9; --g-g:#d95926;
+  --accent:#3987e5;
+}}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --surface-1:#1a1a19; --plane:#0d0d0d;
+  --ink-1:#fff; --ink-2:#c3c2b7; --ink-3:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --g-a:#0ca30c; --g-b:#3987e5; --g-c:#c98500; --g-d:#d03b3b; --g-f:#898781; --g-n:#9085e9; --g-g:#d95926;
+  --accent:#3987e5;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink-1);
+  font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic",sans-serif;
+  font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1900px;margin:0 auto;padding:28px 20px 80px;position:relative}
+h1{font-size:26px;line-height:1.25;margin:0 0 6px;letter-spacing:-.02em;max-width:80ch}
+h2{font-size:17px;margin:0 0 14px;letter-spacing:-.01em}
+.sub{color:var(--ink-2);margin:0 0 24px;max-width:130ch}
+.card{background:var(--surface-1);border:1px solid var(--ring);border-radius:12px;padding:20px;margin-bottom:18px}
+.misslink{color:var(--g-d);font-weight:640;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px;cursor:pointer}
+.misslink:hover{text-decoration-thickness:2px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:12px;margin-bottom:18px}
+.tile{background:var(--surface-1);border:1px solid var(--ring);border-radius:12px;padding:16px 18px}
+.tile .k{font-size:12px;color:var(--ink-2);margin-bottom:6px}
+.tile .v{font-size:26px;font-weight:640;letter-spacing:-.02em;line-height:1.15}
+.tile .n{font-size:11.5px;color:var(--ink-3);margin-top:4px}
+.gchart{display:grid;grid-template-columns:auto 1fr auto;gap:9px 12px;align-items:center;max-width:820px}
+.gchart .gl{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+.gchart .gl b{color:var(--ink-1);font-size:13px;width:12px;display:inline-block}
+.gtrack{background:var(--grid);border-radius:4px;height:20px;overflow:hidden}
+.gtrack i{display:block;height:100%;border-radius:0 4px 4px 0;transition:width .25s}
+.gval{font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink-1);font-weight:620;white-space:nowrap}
+.gval span{color:var(--ink-3);font-weight:400;margin-left:5px}
+.dot{width:9px;height:9px;border-radius:2px;flex:none}
+.ctrls{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end}
+.fld{display:flex;flex-direction:column;gap:5px}
+.fld label{font-size:11.5px;color:var(--ink-2);font-weight:560}
+input[type=search],select{background:var(--plane);color:var(--ink-1);border:1px solid var(--axis);
+  border-radius:7px;padding:7px 10px;font:inherit;font-size:13px;min-width:150px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--axis);background:var(--plane);color:var(--ink-2);border-radius:999px;
+  padding:5px 11px;font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit}
+.chip[aria-pressed=true]{border-color:var(--accent);color:var(--ink-1);
+  background:color-mix(in srgb,var(--accent) 12%,transparent);font-weight:600}
+.btn{border:1px solid var(--axis);background:var(--plane);color:var(--ink-1);border-radius:7px;
+  padding:8px 14px;font:inherit;font-size:13px;font-weight:560;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+/* 필터 줄 고정 — 스크롤해도 조건이 계속 보이게 */
+.ctrls.stick{position:sticky;top:0;z-index:7;background:var(--surface-1);
+  padding:14px 0 13px;border-bottom:1px solid var(--grid);margin-bottom:0}
+/* 표 영역이 자체 스크롤을 갖게 해야 th 의 sticky 가 실제로 동작한다.
+   (overflow-x 만 주면 세로도 스크롤 컨테이너가 되어 헤더가 같이 밀려 올라간다) */
+.tblwrap{overflow:auto;max-height:calc(100vh - 210px);
+  border:1px solid var(--ring);border-radius:12px;background:var(--surface-1)}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+th,td{padding:7px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--grid)}
+th{position:sticky;top:0;background:var(--surface-1);color:var(--ink-2);font-size:11.5px;font-weight:620;
+  text-align:right;cursor:pointer;user-select:none;z-index:3;
+  box-shadow:inset 0 -1px var(--axis), 0 1px 0 var(--axis)}
+th:hover{color:var(--ink-1)}
+th.l,td.l{text-align:left}
+td{font-variant-numeric:tabular-nums;color:var(--ink-2)}
+td.pn{font-family:ui-monospace,Consolas,monospace;color:var(--ink-1);font-size:12.5px}
+a.plink{color:var(--ink-1);text-decoration:none;border-bottom:1px dotted var(--axis)}
+a.plink:hover{color:var(--accent);border-bottom-color:var(--accent)}
+td.nm{color:var(--ink-1);max-width:190px;overflow:hidden;text-overflow:ellipsis}
+td.hero{color:var(--ink-1);font-weight:650}
+td.why{color:var(--ink-3);font-size:11.5px;max-width:210px;overflow:hidden;text-overflow:ellipsis}
+tbody tr:hover{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.gb{display:inline-flex;align-items:center;gap:5px;font-weight:640;font-size:12px;color:var(--ink-1)}
+.muted{color:var(--ink-3)}
+.foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;
+  padding:12px 4px;font-size:12.5px;color:var(--ink-2)}
+.warn{border-left:3px solid var(--g-d);background:color-mix(in srgb,var(--g-d) 8%,transparent);
+  border-radius:7px;padding:12px 15px;margin:14px 0;font-size:13px;color:var(--ink-2)}
+.warn strong{color:var(--ink-1)}
+.note{border-left:3px solid var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent);
+  border-radius:7px;padding:12px 15px;margin:14px 0;font-size:13px;color:var(--ink-2)}
+.note strong{color:var(--ink-1)}
+.gl-desc{color:var(--ink-3);font-size:11.5px;margin-left:4px}
+.thm{position:absolute;top:20px;right:20px}
+.mlink{display:inline-block;margin-top:8px;color:var(--accent);font-weight:560;text-decoration:none}
+.mlink:hover{text-decoration:underline}
+@media(max-width:640px){.wrap{padding:20px 13px 60px}h1{font-size:21px}.tile .v{font-size:22px}}
+.scope{font-size:.44em;font-weight:600;vertical-align:middle;margin-left:10px;
+  padding:4px 10px;border-radius:999px;background:var(--axis);color:var(--ink-2)}
+td.br,th.br{white-space:nowrap}
+.bdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:middle}
+table.brt{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
+table.brt th,table.brt td{padding:8px 12px;text-align:right;border-bottom:1px solid var(--axis)}
+table.brt th.l,table.brt td.l{text-align:left}
+table.brt th{color:var(--ink-2);font-weight:600}
+table.sum{width:100%;border-collapse:collapse;font-size:13px}
+table.sum th,table.sum td{padding:8px 12px;text-align:right;border-bottom:1px solid var(--axis);
+  white-space:nowrap;position:static;cursor:default;box-shadow:none}
+table.sum th.l,table.sum td.l{text-align:left}
+table.sum th{color:var(--ink-2);font-weight:600;background:transparent}
+table.sum tr.tot td{border-top:2px solid var(--axis);border-bottom:none;font-weight:660;color:var(--ink-1)}
+.bars{display:grid;grid-template-columns:auto 1fr auto;gap:10px 12px;align-items:center;max-width:960px}
+.bars .bl{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-1);white-space:nowrap;font-weight:600}
+.btrack{background:var(--grid);border-radius:4px;height:22px;overflow:hidden}
+.btrack i{display:block;height:100%;border-radius:0 4px 4px 0;transition:width .25s}
+.bval{font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink-1);font-weight:620;white-space:nowrap}
+.bval span{color:var(--ink-3);font-weight:400;margin-left:6px}
+.bdot2{display:inline-block;width:9px;height:9px;border-radius:2px;flex:none}
+.lo{color:var(--g-a);font-weight:660}
+.hi{color:var(--g-d)}
+.qpart{display:inline-block;margin-left:5px;padding:1px 6px;border-radius:999px;font-size:10.5px;
+  font-weight:600;background:color-mix(in srgb,var(--g-c) 20%,transparent);color:var(--ink-1);vertical-align:middle}
+td.st{font-size:11px;color:var(--ink-3);max-width:120px;overflow:hidden;text-overflow:ellipsis}
+
+.rsn{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.rsn .tile{display:flex;flex-direction:column;gap:4px;cursor:pointer;
+  border-left:3px solid var(--accent)}
+.rsn .tile[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:-2px}
+.rsn .d{font-size:12px;color:var(--ink-2);margin-top:6px;line-height:1.5}
+td.alt span{display:inline-block;padding:1px 6px;border-radius:99px;font-size:11px;
+  background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);margin-right:3px}
+td.none{color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>미산출 사유 — 센터가 기준</h1>
+<p class="sub">센터가 × (1 − 메이커 할인율) 로 <strong>센터가 기준</strong> 매입단가를 내는데, 둘 중 하나가 없어 계산이 서지 않은 부품입니다.<br>
+<a class="mlink" href="재고_센터가_매입처_기준_매입단가_재산정.html">← 기준 비교 본문으로</a></p>
+
+<div class="tiles" id="top"></div>
+
+<div class="card">
+  <h2>사유별 (눌러서 아래 표를 거릅니다)</h2>
+  <div class="rsn" id="rsn"></div>
+</div>
+
+<div class="card">
+  <h2 id="listh">부품 목록</h2>
+  <div class="ctrls stick">
+    <div class="fld"><label for="q">품번 · 부품명 검색</label>
+      <input type="search" id="q" placeholder="품번 또는 부품명 일부" autocomplete="off"></div>
+    <div class="fld"><label for="br">지점</label><select id="br"></select></div>
+    <div class="fld"><label for="mk">메이커</label><select id="mk"></select></div>
+    <div class="fld"><label for="al">다른 기준 값</label><select id="al">
+      <option value="">전체</option>
+      <option value="has">다른 기준에는 값이 있음</option>
+      <option value="none">어느 기준으로도 값 없음</option>
+    </select></div>
+    <div class="fld"><label>&nbsp;</label><button class="btn" id="csv">CSV 내려받기</button></div>
+  </div>
+  <div class="tblwrap"><table class="sum" id="tb"><thead id="th"></thead><tbody id="tbody"></tbody></table></div>
+  <p class="foot" id="foot"></p>
+</div>
+</div>
+<script>
+const D={"title":"미산출 사유 — 센터가 기준","lead":"센터가 × (1 − 메이커 할인율) 로 <strong>센터가 기준</strong> 매입단가를 내는데, 둘 중 하나가 없어 계산이 서지 않은 부품입니다.","cols":["지점","품번","부품명","메이커","등급","현재고수량","센터가","할인율","할인율출처"],"total":1881,"miss":19,"tiles":[],"rows":[{"지점":"성수","품번":"000989510717","부품명":"엔진오일","메이커":"MB","등급":"B","현재고수량":5,"센터가":null,"할인율":23.0,"할인율출처":"할인율표","_alt":["재고"],"_why":["센터가 없음"]},{"지점":"성수","품번":"0039902497","부품명":"","메이커":"MB","등급":"B","현재고수량":9,"센터가":null,"할인율":23.0,"할인율출처":"할인율표","_alt":["재고","파츠몰","SK"],"_why":["센터가 없음"]},{"지점":"성수","품번":"191971908","부품명":"","메이커":"PRS","등급":"B","현재고수량":1,"센터가":null,"할인율":10.0,"할인율출처":"할인율표","_alt":["재고","파츠몰","SK"],"_why":["센터가 없음"]},{"지점":"성수","품번":"4KE121283B","부품명":"에어가이드좌","메이커":"VA","등급":"B","현재고수량":1,"센터가":null,"할인율":16.0,"할인율출처":"담당자 확인","_alt":["재고","파츠몰","SK"],"_why":["센터가 없음"]},{"지점":"성수","품번":"4KE121284B","부품명":"에어가이드우","메이커":"VA","등급":"B","현재고수량":1,"센터가":null,"할인율":16.0,"할인율출처":"담당자 확인","_alt":["재고","파츠몰","SK"],"_why":["센터가 없음"]},{"지점":"성수","품번":"4KE121285C","부품명":"에어가이드상","메이커":"VA","등급":"B","현재고수량":1,"센터가":null,"할인율":16.0,"할인율출처":"담당자 확인","_alt":["재고","파츠몰","SK"],"_why":["센터가 없음"]},{"지점":"성수","품번":"4KE121286C","부품명":"에어가이드하","메이커":"VA","등급":"B","현재고수량":1,"센터가":null,"할인율":16.0,"할인율출처":"담당자 확인","_alt":["재고","파츠몰","SK"],"_why":["센터가 없음"]},{"지점":"성수","품번":"51117331745","부품명":"워셔 노즐 커버 좌","메이커":"BMW","등급":"B","현재고수량":1,"센터가":null,"할인율":10.0,"할인율출처":"할인율표","_alt":["재고"],"_why":["센터가 없음"]},{"지점":"성수","품번":"51117331746","부품명":"워셔 노즐 커부 우","메이커":"BMW","등급":"B","현재고수량":1,"센터가":null,"할인율":10.0,"할인율출처":"할인율표","_alt":["재고"],"_why":["센터가 없음"]},{"지점":"성수","품번":"971121333F","부품명":"","메이커":"PRS","등급":"A","현재고수량":1,"센터가":null,"할인율":10.0,"할인율출처":"할인율표","_alt":["재고","파츠몰","SK"],"_why":["센터가 없음"]},{"지점":"성수","품번":"971616214B","부품명":"","메이커":"PRS","등급":"B","현재고수량":1,"센터가":null,"할인율":10.0,"할인율출처":"할인율표","_alt":["재고","파츠몰","SK"],"_why":["센터가 없음"]},{"지점":"성수","품번":"971807549G","부품명":"","메이커":"PRS","등급":"B","현재고수량":1,"센터가":null,"할인율":10.0,"할인율출처":"할인율표","_alt":["재고","파츠몰","SK"],"_why":["센터가 없음"]},{"지점":"성수","품번":"971807833COK1","부품명":"","메이커":"PRS","등급":"B","현재고수량":1,"센터가":null,"할인율":10.0,"할인율출처":"할인율표","_alt":["재고","SK"],"_why":["센터가 없음"]},{"지점":"성수","품번":"99919022701","부품명":"","메이커":"PRS","등급":"B","현재고수량":60,"센터가":null,"할인율":10.0,"할인율출처":"할인율표","_alt":["재고","파츠몰","SK"],"_why":["센터가 없음"]},{"지점":"성수","품번":"FY0000000015","부품명":"","메이커":"ZZZ","등급":"A","현재고수량":2,"센터가":null,"할인율":0.0,"할인율출처":"할인율표","_alt":["재고"],"_why":["센터가 없음"]},{"지점":"성수","품번":"FY0000000031","부품명":"브레이크 오일","메이커":"XX1","등급":"B","현재고수량":5,"센터가":9000,"할인율":null,"할인율출처":null,"_alt":["재고"],"_why":["할인율 미등록"]},{"지점":"성수","품번":"G052910M4","부품명":"","메이커":"VA","등급":"A","현재고수량":3,"센터가":null,"할인율":16.0,"할인율출처":"담당자 확인","_alt":["재고","파츠몰","SK"],"_why":["센터가 없음"]},{"지점":"광주","품번":"66140","부품명":"제논전구(D1S)","메이커":"BMW","등급":"F","현재고수량":2,"센터가":null,"할인율":10.0,"할인율출처":"할인율표","_alt":[],"_why":["센터가 없음"]},{"지점":"광주","품번":"W711495S900","부품명":"클립너트","메이커":"FOD","등급":"F","현재고수량":1,"센터가":null,"할인율":25.0,"할인율출처":"할인율표","_alt":["파츠몰","SK"],"_why":["센터가 없음"]}],"reasons":[{"label":"센터가 없음","desc":"센터가 테이블에 해당 품번이 없다. 센터가가 있어야 할인율을 곱할 수 있다.","n":18,"qty":93,"codes":["000989510717","0039902497","191971908","4KE121283B","4KE121284B","4KE121285C","4KE121286C","51117331745","51117331746","971121333F","971616214B","971807549G","971807833COK1","99919022701","FY0000000015","G052910M4","66140","W711495S900"]},{"label":"할인율 미등록","desc":"센터가는 있지만 그 메이커의 할인율이 등록돼 있지 않다.","n":1,"qty":5,"codes":["FY0000000031"]}],"source":"재고_센터가_매입처_기준_매입단가_재산정.html"};
+const nf=n=>(n==null?"-":Number(n).toLocaleString("ko-KR"));
+const esc=s=>String(s==null?"":s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));
+const NUM=new Set(["현재고수량","입고건수","유가입고건수","원가확인수량","원가미상수량",
+                   "센터가","할인율","단가_파츠몰","단가_SK"]);
+let pick="";
+// 본문에서 '파츠몰 301' 을 눌러 왔으면 그 매입처만 보여 준다 (#파츠몰 / #SK)
+let vend=decodeURIComponent((location.hash||"").slice(1));
+if(!["파츠몰","SK"].includes(vend)) vend="";
+
+const TOP = (D.tiles && D.tiles.length) ? D.tiles : [
+  {k:"미산출 부품", v:nf(D.miss)+"개", n:"재고 보유 "+nf(D.total)+"개 중"},
+  {k:"비중", v:(100*D.miss/D.total).toFixed(1)+"%", n:"재고 보유 기준"},
+  {k:"사유 종류", v:D.reasons.length+"가지", n:"아래에서 나눠 봅니다"},
+];
+document.getElementById("top").innerHTML=TOP.map(t=>
+  `<div class="tile"><div class="k">${esc(t.k)}</div><div class="v">${esc(t.v)}</div>
+   <div class="n">${esc(t.n)}</div></div>`).join("");
+
+document.getElementById("rsn").innerHTML=D.reasons
+  .map((r,i)=>({r,i})).filter(({r})=>!vend || r.label.indexOf(vend+" ")===0).map(({r,i})=>
+  `<div class="tile" role="button" tabindex="0" aria-pressed="false" data-i="${i}">
+     <div class="k">${esc(r.label)}</div><div class="v">${nf(r.n)}개</div>
+     <div class="n">재고 ${nf(r.qty)}개</div><div class="d">${esc(r.desc)}</div></div>`).join("");
+
+document.getElementById("rsn").addEventListener("click",e=>{
+  const t=e.target.closest(".tile"); if(!t) return;
+  const lab=D.reasons[+t.dataset.i].label;
+  pick = (pick===lab) ? "" : lab;
+  [...document.querySelectorAll("#rsn .tile")].forEach(x=>
+    x.setAttribute("aria-pressed", D.reasons[+x.dataset.i].label===pick));
+  draw();
+});
+
+function fill(id,vals,label){
+  const s=document.getElementById(id);
+  s.innerHTML=`<option value="">${label}</option>`+
+    [...new Set(vals)].filter(Boolean).sort((a,b)=>String(a).localeCompare(String(b),"ko"))
+      .map(v=>`<option>${esc(v)}</option>`).join("");
+}
+fill("br",D.rows.map(r=>r["지점"]),"전체");
+fill("mk",D.rows.map(r=>r["메이커"]),"전체");
+
+document.getElementById("th").innerHTML="<tr>"+
+  D.cols.map(c=>`<th class="${NUM.has(c)?"":"l"}">${esc(c.replace("_"," "))}</th>`).join("")+
+  `<th class="l">사유</th><th class="l">다른 기준 값</th></tr>`;
+
+function view(){
+  const q=document.getElementById("q").value.trim().toLowerCase();
+  const br=document.getElementById("br").value, mk=document.getElementById("mk").value;
+  const al=document.getElementById("al").value;
+  return D.rows.filter(r=>{
+    if(vend && !r._why.some(w=>w.indexOf(vend+" ")===0)) return false;
+    if(br && r["지점"]!==br) return false;
+    if(mk && r["메이커"]!==mk) return false;
+    if(pick && !r._why.includes(pick)) return false;
+    if(al==="has" && !r._alt.length) return false;
+    if(al==="none" && r._alt.length) return false;
+    if(q && !((r["품번"]||"").toLowerCase().includes(q)
+           || (r["부품명"]||"").toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function draw(){
+  const rows=view();
+  document.getElementById("tbody").innerHTML=rows.map(r=>"<tr>"+
+    D.cols.map(c=>{
+      const v=r[c];
+      if(NUM.has(c)) return `<td>${v==null?'<span class="muted">-</span>':nf(v)}</td>`;
+      if(c==="품번") return `<td class="l pn">${esc(v)}</td>`;
+      if(c==="부품명") return `<td class="l nm">${esc(v)}</td>`;
+      return `<td class="l">${v==null?'<span class="muted">-</span>':esc(v)}</td>`;
+    }).join("")+
+    `<td class="l">${esc((r._why||[]).join(", "))}</td>`+
+    (r._alt.length?`<td class="l alt">${r._alt.map(b=>`<span>${b}</span>`).join("")}</td>`
+                  :`<td class="l none">없음</td>`)+
+    "</tr>").join("");
+  document.getElementById("foot").innerHTML=
+    `${nf(rows.length)}개 표시 / 미산출 ${nf(D.miss)}개`+(pick?` · 사유: ${esc(pick)}`:"")
+    +(vend?` · 매입처: ${esc(vend)} <a class="mlink" href="#" id="allv">전체 보기</a>`:"");
+  const av=document.getElementById("allv");
+  if(av) av.onclick=e=>{e.preventDefault();vend="";history.replaceState(null,"",location.pathname);draw();};
+}
+["q","br","mk","al"].forEach(id=>{
+  const el=document.getElementById(id);
+  el.addEventListener(id==="q"?"input":"change",draw);
+});
+document.getElementById("csv").addEventListener("click",()=>{
+  const head=D.cols.concat(["사유","다른 기준 값"]);
+  const q=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+  const csv="\uFEFF"+[head.map(q).join(",")].concat(
+    view().map(r=>D.cols.map(c=>q(r[c])).concat([q((r._why||[]).join(", ")),q(r._alt.join(" "))]).join(","))
+  ).join("\r\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download=D.title.replace(/[^가-힣A-Za-z0-9]+/g,"_")+".csv"; a.click();
+});
+draw();
+</script>
+</body></html>

@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>매입단가 기준 비교 — 재고 · 센터가 · 매입처</title>
+<style>
+:root{
+  color-scheme: light;
+  --surface-1:#fcfcfb; --plane:#f9f9f7;
+  --ink-1:#0b0b0b; --ink-2:#52514e; --ink-3:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
+  --g-a:#0ca30c; --g-b:#2a78d6; --g-c:#c98500; --g-d:#d03b3b; --g-f:#898781; --g-n:#4a3aa7; --g-g:#eb6834;
+  --accent:#2a78d6;
+}
+@media (prefers-color-scheme: dark){:root:where(:not([data-theme="light"])){
+  color-scheme: dark;
+  --surface-1:#1a1a19; --plane:#0d0d0d;
+  --ink-1:#fff; --ink-2:#c3c2b7; --ink-3:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --g-a:#0ca30c; --g-b:#3987e5; --g-c:#c98500; --g-d:#d03b3b; --g-f:#898781; --g-n:#9085e9; --g-g:#d95926;
+  --accent:#3987e5;
+}}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --surface-1:#1a1a19; --plane:#0d0d0d;
+  --ink-1:#fff; --ink-2:#c3c2b7; --ink-3:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --g-a:#0ca30c; --g-b:#3987e5; --g-c:#c98500; --g-d:#d03b3b; --g-f:#898781; --g-n:#9085e9; --g-g:#d95926;
+  --accent:#3987e5;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink-1);
+  font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic",sans-serif;
+  font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1900px;margin:0 auto;padding:28px 20px 80px;position:relative}
+h1{font-size:26px;line-height:1.25;margin:0 0 6px;letter-spacing:-.02em;max-width:80ch}
+h2{font-size:17px;margin:0 0 14px;letter-spacing:-.01em}
+.sub{color:var(--ink-2);margin:0 0 24px;max-width:130ch}
+.card{background:var(--surface-1);border:1px solid var(--ring);border-radius:12px;padding:20px;margin-bottom:18px}
+.misslink{color:var(--g-d);font-weight:640;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px;cursor:pointer}
+.misslink:hover{text-decoration-thickness:2px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:12px;margin-bottom:18px}
+.tile{background:var(--surface-1);border:1px solid var(--ring);border-radius:12px;padding:16px 18px}
+.tile .k{font-size:12px;color:var(--ink-2);margin-bottom:6px}
+.tile .v{font-size:26px;font-weight:640;letter-spacing:-.02em;line-height:1.15}
+.tile .n{font-size:11.5px;color:var(--ink-3);margin-top:4px}
+.gchart{display:grid;grid-template-columns:auto 1fr auto;gap:9px 12px;align-items:center;max-width:820px}
+.gchart .gl{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+.gchart .gl b{color:var(--ink-1);font-size:13px;width:12px;display:inline-block}
+.gtrack{background:var(--grid);border-radius:4px;height:20px;overflow:hidden}
+.gtrack i{display:block;height:100%;border-radius:0 4px 4px 0;transition:width .25s}
+.gval{font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink-1);font-weight:620;white-space:nowrap}
+.gval span{color:var(--ink-3);font-weight:400;margin-left:5px}
+.dot{width:9px;height:9px;border-radius:2px;flex:none}
+.ctrls{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end}
+.fld{display:flex;flex-direction:column;gap:5px}
+.fld label{font-size:11.5px;color:var(--ink-2);font-weight:560}
+input[type=search],select{background:var(--plane);color:var(--ink-1);border:1px solid var(--axis);
+  border-radius:7px;padding:7px 10px;font:inherit;font-size:13px;min-width:150px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--axis);background:var(--plane);color:var(--ink-2);border-radius:999px;
+  padding:5px 11px;font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit}
+.chip[aria-pressed=true]{border-color:var(--accent);color:var(--ink-1);
+  background:color-mix(in srgb,var(--accent) 12%,transparent);font-weight:600}
+.btn{border:1px solid var(--axis);background:var(--plane);color:var(--ink-1);border-radius:7px;
+  padding:8px 14px;font:inherit;font-size:13px;font-weight:560;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+/* 필터 줄 고정 — 스크롤해도 조건이 계속 보이게 */
+.ctrls.stick{position:sticky;top:0;z-index:7;background:var(--surface-1);
+  padding:14px 0 13px;border-bottom:1px solid var(--grid);margin-bottom:0}
+/* 표 영역이 자체 스크롤을 갖게 해야 th 의 sticky 가 실제로 동작한다.
+   (overflow-x 만 주면 세로도 스크롤 컨테이너가 되어 헤더가 같이 밀려 올라간다) */
+.tblwrap{overflow:auto;max-height:calc(100vh - 210px);
+  border:1px solid var(--ring);border-radius:12px;background:var(--surface-1)}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+th,td{padding:7px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--grid)}
+th{position:sticky;top:0;background:var(--surface-1);color:var(--ink-2);font-size:11.5px;font-weight:620;
+  text-align:right;cursor:pointer;user-select:none;z-index:3;
+  box-shadow:inset 0 -1px var(--axis), 0 1px 0 var(--axis)}
+th:hover{color:var(--ink-1)}
+th.l,td.l{text-align:left}
+td{font-variant-numeric:tabular-nums;color:var(--ink-2)}
+td.pn{font-family:ui-monospace,Consolas,monospace;color:var(--ink-1);font-size:12.5px}
+a.plink{color:var(--ink-1);text-decoration:none;border-bottom:1px dotted var(--axis)}
+a.plink:hover{color:var(--accent);border-bottom-color:var(--accent)}
+td.nm{color:var(--ink-1);max-width:190px;overflow:hidden;text-overflow:ellipsis}
+td.hero{color:var(--ink-1);font-weight:650}
+td.why{color:var(--ink-3);font-size:11.5px;max-width:210px;overflow:hidden;text-overflow:ellipsis}
+tbody tr:hover{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.gb{display:inline-flex;align-items:center;gap:5px;font-weight:640;font-size:12px;color:var(--ink-1)}
+.muted{color:var(--ink-3)}
+.foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;
+  padding:12px 4px;font-size:12.5px;color:var(--ink-2)}
+.warn{border-left:3px solid var(--g-d);background:color-mix(in srgb,var(--g-d) 8%,transparent);
+  border-radius:7px;padding:12px 15px;margin:14px 0;font-size:13px;color:var(--ink-2)}
+.warn strong{color:var(--ink-1)}
+.note{border-left:3px solid var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent);
+  border-radius:7px;padding:12px 15px;margin:14px 0;font-size:13px;color:var(--ink-2)}
+.note strong{color:var(--ink-1)}
+.gl-desc{color:var(--ink-3);font-size:11.5px;margin-left:4px}
+.thm{position:absolute;top:20px;right:20px}
+.mlink{display:inline-block;margin-top:8px;color:var(--accent);font-weight:560;text-decoration:none}
+.mlink:hover{text-decoration:underline}
+@media(max-width:640px){.wrap{padding:20px 13px 60px}h1{font-size:21px}.tile .v{font-size:22px}}
+.scope{font-size:.44em;font-weight:600;vertical-align:middle;margin-left:10px;
+  padding:4px 10px;border-radius:999px;background:var(--axis);color:var(--ink-2)}
+td.br,th.br{white-space:nowrap}
+.bdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:middle}
+table.brt{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
+table.brt th,table.brt td{padding:8px 12px;text-align:right;border-bottom:1px solid var(--axis)}
+table.brt th.l,table.brt td.l{text-align:left}
+table.brt th{color:var(--ink-2);font-weight:600}
+table.sum{width:100%;border-collapse:collapse;font-size:13px}
+table.sum th,table.sum td{padding:8px 12px;text-align:right;border-bottom:1px solid var(--axis);
+  white-space:nowrap;position:static;cursor:default;box-shadow:none}
+table.sum th.l,table.sum td.l{text-align:left}
+table.sum th{color:var(--ink-2);font-weight:600;background:transparent}
+table.sum tr.tot td{border-top:2px solid var(--axis);border-bottom:none;font-weight:660;color:var(--ink-1)}
+.bars{display:grid;grid-template-columns:auto 1fr auto;gap:10px 12px;align-items:center;max-width:960px}
+.bars .bl{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-1);white-space:nowrap;font-weight:600}
+.btrack{background:var(--grid);border-radius:4px;height:22px;overflow:hidden}
+.btrack i{display:block;height:100%;border-radius:0 4px 4px 0;transition:width .25s}
+.bval{font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink-1);font-weight:620;white-space:nowrap}
+.bval span{color:var(--ink-3);font-weight:400;margin-left:6px}
+.bdot2{display:inline-block;width:9px;height:9px;border-radius:2px;flex:none}
+.lo{color:var(--g-a);font-weight:660}
+.hi{color:var(--g-d)}
+.thnote{display:block;font-weight:400;font-size:10.5px;color:var(--ink-3);margin-top:2px}
+.qpart{display:inline-block;margin-left:7px;white-space:nowrap;padding:1px 6px;border-radius:999px;font-size:10.5px;
+  font-weight:600;background:color-mix(in srgb,var(--g-c) 20%,transparent);color:var(--ink-1);vertical-align:middle}
+td.st{font-size:11px;color:var(--ink-3);max-width:120px;overflow:hidden;text-overflow:ellipsis}
+</style>
+</head>
+<body>
+<div class="wrap">
+<button class="btn thm" id="thm" type="button">◐ 테마</button>
+
+<h1>매입단가 기준 비교 <span class="scope">재고 · 센터가 · 매입처</span></h1>
+<p class="sub">같은 재고를 <strong>네 가지 기준</strong>으로 각각 평가하면 금액이 얼마나 달라지는지 비교합니다.
+매입처는 <strong>파츠몰·SK를 합치지 않고 각각</strong> 총액을 냅니다.
+매입처가 제시한 할인율은 반영하지 않고 <strong>공급가를 그대로</strong> 매입단가로 씁니다.
+<a class="mlink" style="margin-right:18px" href="index.html">통합 결과 보기 →</a>
+<a class="mlink" style="margin-right:18px" href="매입단가_센터가재산정.html">센터가 재산정 보기 →</a>
+<a class="mlink" href="매입단가_산출방법.html">산출 방법 →</a></p>
+
+<div class="tiles" id="tiles"></div>
+
+<div class="card">
+  <h2>기준별 재고 평가액</h2>
+  <div class="bars" id="bars"></div>
+  <div style="overflow-x:auto;margin-top:18px"><table class="sum"><thead><tr>
+    <th class="l">기준</th><th class="l">매입단가를 어디서 가져오나</th>
+    <th>산출된 부품</th><th>미산출</th><th>전체 총액</th><th>공통분 총액</th>
+  </tr></thead><tbody id="sumtb"></tbody></table></div>
+  <div class="warn" id="cover"></div>
+</div>
+
+<div class="card" id="brcard" hidden>
+  <h2>지점별</h2>
+  <div style="overflow-x:auto"><table class="sum"><thead><tr id="brhead"></tr></thead><tbody id="brtb"></tbody></table></div>
+</div>
+
+<div class="card">
+  <h2 id="listh">부품별 비교</h2>
+  <div class="ctrls stick">
+    <div class="fld"><label for="q">품번 · 부품명 검색</label>
+      <input type="search" id="q" placeholder="품번 또는 부품명 일부" autocomplete="off"></div>
+    <div class="fld" id="brfld"><label for="br">지점</label><select id="br"></select></div>
+    <div class="fld"><label for="mk">메이커</label><select id="mk"></select></div>
+    <div class="fld"><label for="cm">비교 범위</label>
+      <select id="cm">
+        <option value="">전체 재고 보유</option>
+        <option value="all4">네 기준 모두 값이 있는 것만</option>
+        <option value="vend">매입처 두 곳 모두 있는 것만</option>
+        <option value="miss">공급가 미제공이 있는 것만</option>
+      </select></div>
+    <div class="fld"><label>등급</label><div class="chips" id="gchips"></div></div>
+    <div class="fld"><label for="pp">표시 행수</label>
+      <select id="pp"><option>50</option><option selected>100</option><option>300</option><option value="99999">전체</option></select></div>
+    <button class="btn pri" id="csv" type="button">CSV 내려받기</button>
+  </div>
+  <div class="tblwrap">
+    <table><thead><tr id="thr"></tr></thead><tbody id="tb"></tbody></table>
+  </div>
+  <div class="foot">
+    <span id="cnt" class="muted"></span>
+    <span><button class="btn" id="prev" type="button">이전</button>
+      <button class="btn" id="next" type="button">다음</button></span>
+  </div>
+</div>
+
+<div class="card">
+  <h2>읽기 전 확인</h2>
+  <div class="warn" id="cautions"></div>
+</div>
+
+<div class="foot"><span id="meta" class="muted"></span></div>
+</div>
+
+<script>
+const D = /*__DATA__*/;
+const F = D.fields;
+const I={}; F.forEach((k,i)=>I[k]=i);
+const S=D.summary, BC=S.기준비교, BASES=BC.기준;
+["품번","지점","등급","현재고수량","단가_재고","단가_센터가","단가_파츠몰","단가_SK",
+ "평가액_재고","평가액_센터가","평가액_파츠몰","평가액_SK","상태_파츠몰","상태_SK"]
+  .forEach(k=>{ if(I[k]===undefined) console.error("데이터에 필드 없음:",k); });
+const R=D.items.filter(r=>r[I.현재고수량]>0);
+const GORD="ABCDNFG";
+const GC={A:"var(--g-a)",B:"var(--g-b)",C:"var(--g-c)",D:"var(--g-d)",N:"var(--g-n)",G:"var(--g-g)",F:"var(--g-f)"};
+const BPAL={"재고":"var(--g-b)","센터가":"var(--g-c)","파츠몰":"var(--g-n)","SK":"var(--g-a)"};
+const BDESC={"재고":"선입선출로 확정된 매입원가","센터가":"센터가 × (1 − 메이커 할인율)",
+             "파츠몰":"파츠몰 공급가 (할인율 미반영)","SK":"SK 공급가 (할인율 미반영)"};
+const nf=n=>n==null?"—":n.toLocaleString("ko-KR");
+const won=n=>n==null?"—":Math.round(n).toLocaleString("ko-KR")+"원";
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const LINKBASE="https://carang.ipartsnet.co.kr/epmsV3/stock/partStockStoreRelease.asp";
+const pnCell = r => {
+  const sn = r[I.재고번호];
+  const u = LINKBASE + "?keyword=" + encodeURIComponent(r[0]) + (sn!=null ? "&stockNo="+encodeURIComponent(sn) : "");
+  return `<a class="plink" href="${u}" target="_blank" rel="noopener" title="재고 입출고 내역 열기">${esc(r[0])}</a>`;
+};
+/* 지점 순서는 산출 스크립트가 정한 순서를 따른다 */
+const BRS=(S.지점목록||[]).filter(b=>R.some(r=>r[I.지점]===b))
+  .concat([...new Set(R.map(r=>r[I.지점]).filter(Boolean))].filter(b=>!(S.지점목록||[]).includes(b)));
+const BRPAL=["#3b82f6","#f59e0b","#10b981","#a855f7"];
+const BRC=b=>BRPAL[Math.max(0,BRS.indexOf(b))%BRPAL.length];
+
+/* 한 부품에서 값이 있는 기준들 중 가장 싼 것 — 비교의 핵심이라 표에서 강조한다 */
+const cheapest = r => {
+  let best=null;
+  BASES.forEach(b=>{ const v=r[I["단가_"+b]]; if(v!=null && (best==null || v<r[I["단가_"+best]])) best=b; });
+  return best;
+};
+const all4 = r => BASES.every(b=>r[I["단가_"+b]]!=null);
+const bothVend = r => r[I.단가_파츠몰]!=null && r[I.단가_SK]!=null;
+const anyMiss = r => r[I.상태_파츠몰]==="공급가 미제공" || r[I.상태_SK]==="공급가 미제공";
+
+let page=0, sortK="평가액_센터가", sortD=-1, q="", mk="", br="", cm="",
+    gsel=new Set(GORD.split(""));
+
+// 미산출 숫자를 누르면 사유를 부품 단위로 펼친 페이지로 간다 (build_missing.py)
+const MISSPAGE={"재고":"미산출_재고.html","센터가":"미산출_센터가.html",
+                "파츠몰":"미산출_매입처.html#파츠몰","SK":"미산출_매입처.html#SK"};
+const misslink=(b,n)=> n
+  ? `<a class="misslink" href="${MISSPAGE[b]}" title="미산출 사유 보기">${nf(n)}개</a>`
+  : `${nf(n)}개`;
+
+/* ---------- 타일 ---------- */
+{
+  const t=[["재고 보유 부품", nf(S.재고보유)+"개", "재고 "+nf(S.재고수량)+"개"]];
+  BASES.forEach(b=>{
+    const x=BC.기준별[b];
+    t.push([b+" 기준 총액", won(x.총액),
+            nf(x.부품)+"개 산출 · 미산출 "+misslink(b, x.미산출)]);
+  });
+  document.getElementById("tiles").innerHTML=t.map(([k,v,n])=>
+    `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join("");
+}
+
+/* ---------- 막대 + 표 ---------- */
+{
+  const mx=Math.max(...BASES.map(b=>BC.기준별[b].총액))||1;
+  document.getElementById("bars").innerHTML=BASES.map(b=>{
+    const x=BC.기준별[b];
+    return `<div class="bl"><i class="bdot2" style="background:${BPAL[b]}"></i>${b}</div>
+      <div class="btrack"><i style="width:${(100*x.총액/mx).toFixed(1)}%;background:${BPAL[b]}"></i></div>
+      <div class="bval">${nf(x.총액)}원<span>${nf(x.부품)}개</span></div>`;}).join("");
+
+  document.getElementById("sumtb").innerHTML=BASES.map(b=>{
+    const x=BC.기준별[b];
+    return `<tr><td class="l"><i class="bdot2" style="background:${BPAL[b]}"></i> <strong>${b}</strong></td>
+      <td class="l muted">${BDESC[b]}</td>
+      <td>${nf(x.부품)}</td>
+      <td>${x.미산출?misslink(b,x.미산출):'<span class="muted">0</span>'}</td>
+      <td>${nf(x.총액)}</td><td>${nf(x.공통총액)}</td></tr>`;}).join("");
+}
+
+document.getElementById("cover").innerHTML=
+  `<strong>총액을 그대로 비교하면 안 됩니다.</strong> 기준마다 값이 있는 부품이 달라서
+   ${BASES.map(b=>`${b} ${nf(BC.기준별[b].부품)}개`).join(" · ")}로 모수가 제각각입니다.
+   같은 잣대로 보시려면 <strong>공통분 총액</strong>(네 기준 모두 값이 있는
+   <strong>${nf(BC.공통부품)}개 · 재고 ${nf(BC.공통수량)}개</strong>)을 비교하세요.
+   목록의 <em>비교 범위</em>에서 같은 조건으로 추릴 수 있습니다.`;
+
+/* ---------- 지점별 ---------- */
+if(BRS.length>1 && S.지점별){
+  document.getElementById("brhead").innerHTML=
+    `<th class="l">지점</th><th>재고 보유</th><th>재고 수량</th>`+
+    BASES.map(b=>`<th title="평가액 합계와, 그 기준으로 단가가 나온 부품 수">`
+                +`${b}<span class="thnote">평가액 &middot; 산출 부품 수</span></th>`).join("");
+  document.getElementById("brtb").innerHTML=BRS.map(b=>{
+    const t=R.filter(r=>r[I.지점]===b);
+    return `<tr><td class="l"><i class="bdot" style="background:${BRC(b)}"></i><strong>${esc(b)}</strong></td>
+      <td>${nf(t.length)}</td><td>${nf(t.reduce((a,r)=>a+r[I.현재고수량],0))}</td>`+
+      BASES.map(x=>{
+        // 왼쪽에 '재고 수량' 열이 있어 그냥 '604개' 라고 쓰면 수량으로 읽힌다.
+        // 이 숫자는 그 기준으로 단가가 나온 '부품 수' 다.
+        const got=t.filter(r=>r[I["단가_"+x]]!=null);
+        const n=got.length, q=got.reduce((a,r)=>a+r[I.현재고수량],0);
+        const tip=`${b} · ${x} 기준으로 단가가 나온 부품 ${nf(n)}개 (재고 수량 ${nf(q)}개)`
+                 +` · 미산출 ${nf(t.length-n)}개`;
+        return `<td>${nf(t.reduce((a,r)=>a+(r[I["평가액_"+x]]||0),0))}`
+             + `<span class="qpart" title="${esc(tip)}">부품 ${nf(n)}개</span></td>`;
+      }).join("")+`</tr>`;}).join("");
+  document.getElementById("brcard").hidden=false;
+}
+
+/* ---------- 표 ---------- */
+const COLS=[["품번","l"],["지점","br l"],["부품명","l"],["메이커","l"],["등급","l"],
+            ["현재고수량","","재고 수량"],
+            ["단가_재고","","재고 단가","선입선출로 확정된 매입원가"],
+            ["단가_센터가","","센터가 단가","센터가 × (1 − 메이커 할인율)"],
+            ["단가_파츠몰","","파츠몰 공급가","할인율 미반영, 공급가 그대로"],
+            ["단가_SK","","SK 공급가","할인율 미반영, 공급가 그대로"],
+            ["평가액_재고","","재고 평가액"],
+            ["평가액_센터가","","센터가 평가액"],
+            ["평가액_파츠몰","","파츠몰 평가액"],
+            ["평가액_SK","","SK 평가액"],
+            ["상태_파츠몰","l","파츠몰 상태"],
+            ["상태_SK","l","SK 상태"]];
+function head(){
+  document.getElementById("thr").innerHTML=COLS.map(([k,c,label,tip])=>
+    `<th class="${c.includes('l')?'l':''}" data-k="${k}"${tip?` title="${tip}"`:""}>${label||k}${sortK===k?(sortD<0?" ▾":" ▴"):""}</th>`).join("");
+  document.querySelectorAll("#thr th").forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k; if(sortK===k) sortD*=-1; else {sortK=k;sortD=-1;} page=0; draw();});
+}
+function filtered(){
+  let a=R.filter(r=>gsel.has(r[I.등급])
+    && (!br || r[I.지점]===br)
+    && (!mk || r[I.메이커]===mk)
+    && (cm==="" || (cm==="all4"?all4(r):cm==="vend"?bothVend(r):anyMiss(r)))
+    && (!q || r[0].toLowerCase().includes(q) || (r[I.부품명]||"").toLowerCase().includes(q)));
+  a.sort((x,y)=>{
+    if(sortK==="등급") return (GORD.indexOf(x[I.등급])-GORD.indexOf(y[I.등급]))*sortD;
+    if(["품번","지점","부품명","메이커","상태_파츠몰","상태_SK"].includes(sortK))
+      return String(x[I[sortK]]||"").localeCompare(String(y[I[sortK]]||""),"ko")*sortD;
+    const u=x[I[sortK]], v=y[I[sortK]];
+    if(u==null&&v==null) return 0;
+    if(u==null) return 1;
+    if(v==null) return -1;
+    return (u-v)*sortD;
+  });
+  return a;
+}
+const pcell=(r,b,best)=>{
+  const v=r[I["단가_"+b]];
+  if(v==null) return '<td><span class="muted">—</span></td>';
+  return `<td${b===best?' class="lo"':''}${b===best?' title="이 부품에서 가장 싼 기준"':''}>${nf(v)}</td>`;
+};
+function draw(){
+  const a=filtered(), pp=+document.getElementById("pp").value;
+  const np=Math.max(1,Math.ceil(a.length/pp));
+  if(page>=np) page=np-1;
+  document.getElementById("tb").innerHTML=a.slice(page*pp,(page+1)*pp).map(r=>{
+    const g=r[I.등급], best=cheapest(r);
+    return `<tr>
+<td class="l pn">${pnCell(r)}</td>
+<td class="l br"><i class="bdot" style="background:${BRC(r[I.지점])}"></i>${esc(r[I.지점]||"")}</td>
+<td class="l nm">${r[I.부품명]?esc(r[I.부품명]):'<span class="muted">—</span>'}</td>
+<td class="l">${r[I.메이커]?esc(r[I.메이커]):'<span class="muted">—</span>'}</td>
+<td class="l"><span class="gb"><i class="dot" style="background:${GC[g]}"></i>${g}</span></td>
+<td>${nf(r[I.현재고수량])}</td>
+${BASES.map(b=>pcell(r,b,best)).join("")}
+${BASES.map(b=>`<td>${nf(r[I["평가액_"+b]])}</td>`).join("")}
+<td class="l st" title="${esc((r[I.주의_파츠몰]||r[I.상태_파츠몰])||"")}">${esc(r[I.상태_파츠몰]||"")}</td>
+<td class="l st" title="${esc((r[I.주의_SK]||r[I.상태_SK])||"")}">${esc(r[I.상태_SK]||"")}</td>
+</tr>`;}).join("")||`<tr><td colspan="${COLS.length}" class="l muted" style="padding:26px">조건에 맞는 부품이 없습니다.</td></tr>`;
+  const tot=BASES.map(b=>a.reduce((x,r)=>x+(r[I["평가액_"+b]]||0),0));
+  document.getElementById("cnt").innerHTML=
+    `${nf(a.length)}개 · 재고 ${nf(a.reduce((x,r)=>x+r[I.현재고수량],0))}개 · `+
+    BASES.map((b,i)=>`${b} ${nf(tot[i])}`).join(" · ")+` · ${page+1}/${np} 쪽`;
+  document.getElementById("prev").disabled=page<=0;
+  document.getElementById("next").disabled=page>=np-1;
+  head();
+}
+
+/* 필터 */
+{
+  const c=R.reduce((a,r)=>{const b=r[I.지점]; if(b)a[b]=(a[b]||0)+1; return a;},{});
+  const sel=document.getElementById("br");
+  sel.innerHTML=`<option value="">전체</option>`+
+    BRS.map(b=>`<option value="${esc(b)}">${esc(b)} (${nf(c[b]||0)})</option>`).join("");
+  sel.onchange=e=>{br=e.target.value;page=0;draw();};
+  if(BRS.length<2) document.getElementById("brfld").style.display="none";
+}
+const mkCount=R.reduce((a,r)=>{const m=r[I.메이커]; if(m)a[m]=(a[m]||0)+1; return a;},{});
+document.getElementById("mk").innerHTML=`<option value="">전체</option>`+
+  Object.entries(mkCount).sort((a,b)=>b[1]-a[1])
+    .map(([m,c])=>`<option value="${esc(m)}">${esc(m)} (${nf(c)})</option>`).join("");
+document.getElementById("gchips").innerHTML=GORD.split("").map(g=>
+  `<button class="chip" type="button" aria-pressed="true" data-g="${g}"><i class="dot" style="background:${GC[g]}"></i>${g}</button>`).join("");
+document.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{
+  const g=b.dataset.g,on=b.getAttribute("aria-pressed")==="true";
+  b.setAttribute("aria-pressed",String(!on));
+  if(on) gsel.delete(g); else gsel.add(g);
+  page=0; draw();});
+document.getElementById("q").oninput=e=>{q=e.target.value.trim().toLowerCase();page=0;draw();};
+document.getElementById("mk").onchange=e=>{mk=e.target.value;page=0;draw();};
+document.getElementById("cm").onchange=e=>{cm=e.target.value;page=0;draw();};
+document.getElementById("pp").onchange=()=>{page=0;draw();};
+document.getElementById("prev").onclick=()=>{if(page>0){page--;draw();}};
+document.getElementById("next").onclick=()=>{page++;draw();};
+document.getElementById("thm").onclick=()=>{
+  const cur=document.documentElement.getAttribute("data-theme");
+  const dark=cur?cur==="dark":matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.setAttribute("data-theme",dark?"light":"dark");};
+
+document.getElementById("csv").onclick=()=>{
+  const h=["지점","품번","부품명","메이커","등급","재고수량"]
+    .concat(BASES.map(b=>b+"_단가")).concat(BASES.map(b=>b+"_평가액"))
+    .concat(["파츠몰_상태","SK_상태","파츠몰_브랜드","SK_브랜드","파츠몰_주의","SK_주의"]);
+  const cq=v=>{const s=v==null?"":String(v);return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+  const lines=[h.join(",")].concat(filtered().map(r=>[
+    r[I.지점],r[0],r[I.부품명],r[I.메이커],r[I.등급],r[I.현재고수량]]
+    .concat(BASES.map(b=>r[I["단가_"+b]]))
+    .concat(BASES.map(b=>r[I["평가액_"+b]]))
+    .concat([r[I.상태_파츠몰],r[I.상태_SK],r[I.브랜드_파츠몰],r[I.브랜드_SK],
+             r[I.주의_파츠몰],r[I.주의_SK]]).map(cq).join(",")));
+  const b=new Blob(["﻿"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(b);
+  a.download=`매입단가_기준비교_${S.기준일}.csv`;a.click();URL.revokeObjectURL(a.href);};
+
+document.getElementById("cautions").innerHTML=
+  `<strong>이 비교를 읽을 때</strong><br>
+   · <strong>기준마다 성격이 다릅니다.</strong> 재고는 우리가 실제로 치른 원가, 센터가는 정가에서 할인한 추정치,
+     매입처 공급가는 지금 사면 내야 할 값입니다. 낮다고 좋은 것도, 높다고 나쁜 것도 아닙니다.<br>
+   · <strong>매입처 할인율은 반영하지 않았습니다.</strong> 공급가를 그대로 썼습니다. 추가 할인이 적용된다면 실제 매입가는 더 낮아집니다.<br>
+   · <strong>재고 기준은 확정 원가를 재고 전량에 적용한 값</strong>입니다.
+     통합 결과 페이지의 재고 평가액(원가가 확인된 수량만)과는 분모가 달라 숫자가 다릅니다.<br>
+   · 같은 품번이 브랜드만 다르게 여러 줄인 건 <strong>${nf(BC.브랜드주의)}개</strong> — 우리 메이커 코드에 맞는 줄을 골랐고,
+     해당 행의 상태 칸에 마우스를 올리면 후보가 보입니다.<br>
+   · 파츠몰은 <strong>공급가가 센터가보다 비싼 건</strong>도 있습니다(할인율 음수). 그대로 실었습니다.`;
+
+document.getElementById("listh").textContent=`부품별 비교 (재고 보유 ${nf(R.length)}개)`;
+document.getElementById("meta").textContent=
+  `기준 ${BASES.join(" · ")} · 부품 ${nf(R.length)}개 · 기준일 ${S.기준일}`;
+draw();
+</script>
+</body>
+</html>
