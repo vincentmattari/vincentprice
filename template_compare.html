@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>매입단가 기준 비교 — 재고 · 센터가 · 매입처</title>
+<title>매입단가 기준 비교 — A·B 등급 고정</title>
 <style>
 :root{
   color-scheme: light;
@@ -137,10 +137,12 @@ td.st{font-size:11px;color:var(--ink-3);max-width:120px;overflow:hidden;text-ove
 <div class="wrap">
 <button class="btn thm" id="thm" type="button">◐ 테마</button>
 
-<h1>매입단가 기준 비교 <span class="scope">재고 · 센터가 · 매입처</span></h1>
-<p class="sub">같은 재고를 <strong>네 가지 기준</strong>으로 각각 평가하면 금액이 얼마나 달라지는지 비교합니다.
-매입처는 <strong>파츠몰·SK를 합치지 않고 각각</strong> 총액을 냅니다.
-매입처 <strong>공급가는 할인율이 이미 반영된 값</strong>이라 그대로 매입단가로 씁니다.
+<h1>매입단가 기준 비교 <span class="scope">A·B 등급 고정</span></h1>
+<p class="sub"><strong>A·B 등급은 네 기준 모두 재고 확정단가로 못박고</strong> 비교합니다.
+A·B 는 입고 이력만으로 매입단가가 확정되므로 기준을 바꿀 이유가 없고, 그렇게 고정하면
+총액 차이가 곧 <strong>원가가 불확실한 등급(C·D·N·F·G)에서 벌어지는 차이</strong>가 됩니다.
+재고 기준 총액은 원래 값 그대로입니다. 매입처는 파츠몰·SK를 합치지 않고 각각 냅니다.
+<a class="mlink" style="margin-right:18px" href="재고_센터가_매입처_기준_매입단가_재산정.html">고정 없는 원래 비교 →</a>
 <a class="mlink" style="margin-right:18px" href="index.html">통합 결과 보기 →</a>
 <a class="mlink" style="margin-right:18px" href="매입단가_센터가재산정.html">센터가 재산정 보기 →</a>
 <a class="mlink" href="매입단가_산출방법.html">산출 방법 →</a></p>
@@ -211,8 +213,10 @@ const R=D.items.filter(r=>r[I.현재고수량]>0);
 const GORD="ABCDNFG";
 const GC={A:"var(--g-a)",B:"var(--g-b)",C:"var(--g-c)",D:"var(--g-d)",N:"var(--g-n)",G:"var(--g-g)",F:"var(--g-f)"};
 const BPAL={"재고":"var(--g-b)","센터가":"var(--g-c)","파츠몰":"var(--g-n)","SK":"var(--g-a)"};
-const BDESC={"재고":"선입선출로 확정된 매입원가","센터가":"센터가 × (1 − 메이커 할인율)",
-             "파츠몰":"파츠몰 공급가 (할인율 반영된 값)","SK":"SK 공급가 (할인율 반영된 값)"};
+const BDESC={"재고":"선입선출로 확정된 매입원가",
+             "센터가":"A·B는 재고 확정단가 · 나머지는 센터가 × (1 − 할인율)",
+             "파츠몰":"A·B는 재고 확정단가 · 나머지는 파츠몰 공급가(할인 반영)",
+             "SK":"A·B는 재고 확정단가 · 나머지는 SK 공급가(할인 반영)"};
 const nf=n=>n==null?"—":n.toLocaleString("ko-KR");
 const won=n=>n==null?"—":Math.round(n).toLocaleString("ko-KR")+"원";
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
@@ -244,9 +248,7 @@ let page=0, sortK="평가액_센터가", sortD=-1, q="", mk="", br="", cm="",
 // 미산출 숫자를 누르면 사유를 부품 단위로 펼친 페이지로 간다 (build_missing.py)
 const MISSPAGE={"재고":"미산출_재고.html","센터가":"미산출_센터가.html",
                 "파츠몰":"미산출_매입처.html#파츠몰","SK":"미산출_매입처.html#SK"};
-const misslink=(b,n)=> n
-  ? `<a class="misslink" href="${MISSPAGE[b]}" title="미산출 사유 보기">${nf(n)}개</a>`
-  : `${nf(n)}개`;
+const misslink=(b,n)=> `${nf(n)}개`;   // 이 페이지는 사유 링크를 걸지 않는다
 
 /* ---------- 타일 ---------- */
 {
