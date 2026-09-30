@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>부품 취소·반품 플로우</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --bg:#F1F4F3; --surface:#FFFFFF; --node:#F6F8F8; --band:#E7ECEC;
+  --ink:#17212B; --muted:#5B6873; --line:#C4CDD1; --line-soft:#E1E6E8;
+  --accent:#1D5C8C;
+  --a:#6B45A8; --b:#23775A; --c:#A85F0A; --d:#AD3445; --s:#4A5864;
+  --good:#23775A; --bad:#AD3445;
+  --sans:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#11161A; --surface:#172026; --node:#1D272E; --band:#1F2A31;
+    --ink:#E4EAEE; --muted:#96A4AE; --line:#3A4852; --line-soft:#26313A;
+    --accent:#7DB3DF;
+    --a:#B9A0EC; --b:#6FCBA3; --c:#E6A95F; --d:#EF8B99; --s:#B4C0C8;
+    --good:#6FCBA3; --bad:#EF8B99;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11161A; --surface:#172026; --node:#1D272E; --band:#1F2A31;
+  --ink:#E4EAEE; --muted:#96A4AE; --line:#3A4852; --line-soft:#26313A;
+  --accent:#7DB3DF;
+  --a:#B9A0EC; --b:#6FCBA3; --c:#E6A95F; --d:#EF8B99; --s:#B4C0C8;
+  --good:#6FCBA3; --bad:#EF8B99;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6;padding:0 20px}
+.wrap{max-width:1160px;margin:0 auto;padding-block:48px 72px;display:flex;flex-direction:column;gap:56px}
+h1,h2,h3{text-wrap:balance;margin:0;line-height:1.3}
+h1{font-size:34px;font-weight:700;letter-spacing:-0.01em}
+h2{font-size:22px;font-weight:700}
+p{margin:0}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+header{display:flex;flex-direction:column;gap:14px;max-width:780px}
+header .lede{color:var(--muted);max-width:65ch}
+.meta{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:13px;color:var(--muted)}
+.meta b{color:var(--ink);font-weight:600}
+
+.types{display:grid;grid-template-columns:repeat(4,1fr);gap:0 28px;border-top:2px solid var(--ink)}
+.type{display:flex;flex-direction:column;gap:6px;padding-top:14px}
+.type .code{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.type h3{font-size:17px}
+.type p{font-size:14px;color:var(--muted)}
+.type .end{font-size:13px;font-weight:600;color:var(--ink);border-top:1px solid var(--line);padding-top:8px;margin-top:auto}
+
+section{display:flex;flex-direction:column;gap:18px}
+.sec-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:10px 24px}
+.sec-head p{color:var(--muted);font-size:14px;max-width:62ch}
+
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{width:10px;height:10px;border-radius:2px;background:currentColor;display:inline-block}
+.legend .ln{width:22px;height:0;border-top:2px dashed currentColor;border-radius:0;background:none}
+
+.scroll{overflow-x:auto;border:1px solid var(--line);background:var(--surface);border-radius:4px}
+#flow{display:block;width:100%;min-width:980px;height:auto}
+#flow text{font-family:var(--sans)}
+.lane-bg{fill:var(--surface)}
+.lane-bg.sys{fill:var(--node)}
+.lane-head{fill:var(--band)}
+.lane-sep{stroke:var(--line);stroke-width:1}
+.lane-title{fill:var(--ink);font-size:16px;font-weight:700}
+.lane-sub{fill:var(--muted);font-size:12px}
+.node .shape{fill:var(--node);stroke:var(--line);stroke-width:1.2}
+.lane-bg.sys + .node .shape{fill:var(--surface)}
+.node.decision .shape{fill:var(--surface);stroke:var(--ink);stroke-width:1.4}
+.node.end .shape{fill:var(--ink);stroke:none}
+.node.note .shape{fill:none;stroke:var(--line);stroke-dasharray:4 4}
+.node.sys .shape{fill:var(--surface)}
+.n-title{fill:var(--ink);font-size:14px;font-weight:600}
+.n-sub{fill:var(--muted);font-size:12px}
+.node.end .n-title{fill:var(--surface)}
+.node.end .n-sub{fill:var(--surface);opacity:.72}
+.chip rect{fill:currentColor;fill-opacity:.12;stroke:currentColor;stroke-opacity:.4}
+.chip text{fill:currentColor;font-size:11.5px;font-weight:600}
+.k-a{color:var(--a)} .k-b{color:var(--b)} .k-c{color:var(--c)} .k-d{color:var(--d)} .k-s{color:var(--s)} .k-good{color:var(--good)} .k-bad{color:var(--bad)}
+.edge{fill:none;stroke:var(--muted);stroke-width:1.5}
+.edge.para{stroke:var(--accent);stroke-dasharray:6 4}
+.edge.gate{stroke:var(--a);stroke-dasharray:6 4}
+.edge.dot{stroke:var(--line);stroke-dasharray:2 4}
+.ah{fill:var(--muted)} .ah-para{fill:var(--accent)} .ah-gate{fill:var(--a)}
+.elabel{fill:var(--muted);font-size:11.5px;font-weight:500;paint-order:stroke;stroke:var(--surface);stroke-width:5px;stroke-linejoin:round}
+.elabel.sys{stroke:var(--node)}
+.elabel.para{fill:var(--accent)} .elabel.gate{fill:var(--a)}
+
+.toggle{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--surface)}
+.toggle input{position:absolute;opacity:0;pointer-events:none}
+.toggle label{padding:7px 14px;font-size:13px;cursor:pointer;color:var(--muted);font-weight:500}
+.toggle input:checked + label{background:var(--ink);color:var(--surface)}
+.toggle input:focus-visible + label{outline:2px solid var(--accent);outline-offset:-2px}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:13px}
+th,td{padding:10px;text-align:left;vertical-align:middle;border-bottom:1px solid var(--line-soft)}
+thead th{font-weight:600;font-size:12.5px;border-bottom:1px solid var(--line);vertical-align:bottom}
+thead th small{display:block;font-weight:400;color:var(--muted);font-size:11.5px}
+thead th .step{font-family:var(--mono);color:var(--muted);font-size:11px;display:block}
+tbody th{font-weight:600;white-space:nowrap;position:sticky;left:0;background:var(--surface);z-index:1}
+tbody th small{display:block;color:var(--muted);font-weight:400;font-size:11.5px}
+.v{color:var(--muted);white-space:nowrap}
+.v.chg{display:inline-block;color:currentColor;font-weight:600;padding:1px 8px;border-radius:3px;background:color-mix(in srgb,currentColor 12%,transparent);border:1px solid color-mix(in srgb,currentColor 40%,transparent)}
+.v.null{font-family:var(--mono);font-size:12px;color:var(--muted);opacity:.7}
+.table-note{font-size:13px;color:var(--muted);max-width:80ch}
+
+.defs{display:flex;flex-direction:column;border-top:2px solid var(--ink)}
+.def{display:grid;grid-template-columns:170px 1fr;gap:6px 28px;padding:18px 0;border-bottom:1px solid var(--line)}
+.def h3{font-size:16px;display:flex;flex-direction:column;gap:2px}
+.def h3 small{font-size:12px;color:var(--muted);font-weight:400}
+.flowline{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px}
+.flowline .st{padding:2px 9px;border-radius:3px;color:currentColor;background:color-mix(in srgb,currentColor 11%,transparent);border:1px solid color-mix(in srgb,currentColor 38%,transparent);font-weight:600}
+.flowline .st.new{box-shadow:0 0 0 2px var(--surface),0 0 0 3px currentColor}
+.flowline .ar,.flowline .or{color:var(--muted);font-size:12px}
+.flowline .nl{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.def ul{margin:10px 0 0;padding-left:18px;font-size:14px;display:flex;flex-direction:column;gap:3px;max-width:72ch}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:0 6px;border-radius:3px;border:1px solid currentColor;margin-left:4px;vertical-align:1px}
+
+.rules{width:100%;min-width:0;font-size:14px}
+.rules td:nth-child(2),.rules td:nth-child(3){white-space:nowrap}
+.ok{color:var(--good);font-weight:600} .no{color:var(--bad);font-weight:600} .out{color:var(--s);font-weight:600}
+
+.dev{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:0 36px}
+.dev ul{list-style:none;margin:0;padding:0}
+.dev li{padding:12px 0;border-bottom:1px solid var(--line-soft)}
+.dev b{font-weight:600}
+.dev .who{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:block}
+
+@media (max-width:860px){ .types{grid-template-columns:repeat(2,1fr);gap:20px 28px} }
+@media (max-width:640px){
+  h1{font-size:27px}
+  .types{grid-template-columns:1fr}
+  .def{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">부품 취소 · 반품 프로세스</span>
+    <h1>부품 취소·반품 플로우</h1>
+    <p class="lede">주문상세에서 부품을 취소한 뒤 견적팀·물류팀·회계팀과 재고 시스템이 바꾸는 상태값을 순서대로 정리했습니다. 확정된 요구사항 정리 문서를 기준으로 그렸습니다.</p>
+    <div class="meta"><span>기준 문서 <b>요구사항_정리.md (3차 확정)</b></span><span>작성 <b>2026-09-15</b></span><span>반품신청서 상태 <b>4종</b></span></div>
+  </header>
+
+  <div class="types" aria-label="처리 결과 네 가지">
+    <div class="type"><span class="code">유형 0</span><h3>삭제</h3><p>매입처가 발송하기 전에 취소. 매입처 발주·차감이 없음.</p><span class="end">주문에서 부품 삭제</span></div>
+    <div class="type"><span class="code">유형 ①</span><h3>반품</h3><p>반품신청서 신청완료 후 다음날 반품배송, 배송완료 뒤 계산서 취소.</p><span class="end">재고에서 반품완료 출고</span></div>
+    <div class="type"><span class="code">유형 ②</span><h3>재판매</h3><p>회수완료·입고 상태에서 판매. 반품배송·계산서 취소는 null.</p><span class="end">판매 출고</span></div>
+    <div class="type"><span class="code">유형 ③</span><h3>신청불필요</h3><p>매입처 발주상태 취소 + 미차감. 공장으로 나가지 않아 회수도 없음.</p><span class="end">재고에서 제외</span></div>
+  </div>
+
+  <section>
+    <div class="sec-head">
+      <h2>업무 흐름</h2>
+      <p>위에서 아래로 시간 순서입니다. 파란 점선은 동시에 진행되는 흐름, 보라 점선은 반품신청서 조건입니다.</p>
+    </div>
+    <div class="legend">
+      <span class="k-a"><i></i>반품신청서</span>
+      <span class="k-b"><i></i>회수</span>
+      <span class="k-c"><i></i>반품배송</span>
+      <span class="k-d"><i></i>계산서 취소</span>
+      <span class="k-s"><i></i>재고</span>
+      <span class="k-good"><i></i>판매 가능</span>
+      <span class="k-bad"><i></i>판매 불가</span>
+      <span style="color:var(--accent)"><i class="ln"></i>동시 진행</span>
+      <span class="k-a"><i class="ln"></i>신청완료 조건</span>
+    </div>
+    <div class="scroll"><svg id="flow" viewBox="0 0 1160 1490" role="img" aria-label="견적팀, 물류팀, 재고·판매, 회계팀 레인으로 그린 부품 취소 반품 흐름도"></svg></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>유형별 상태값 변화</h2>
+      <div class="toggle" role="radiogroup" aria-label="처리 유형">
+        <input type="radio" name="scn" id="scn-ret" value="ret" checked><label for="scn-ret">① 반품</label>
+        <input type="radio" name="scn" id="scn-resale" value="resale"><label for="scn-resale">② 재판매</label>
+        <input type="radio" name="scn" id="scn-none" value="none"><label for="scn-none">③ 신청불필요</label>
+      </div>
+    </div>
+    <div class="scroll"><table id="matrix"></table></div>
+    <p class="table-note" id="matrix-note"></p>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>상태값 정의</h2></div>
+    <div class="defs">
+      <div class="def">
+        <h3>A. 반품신청서<small>견적팀 · 취소리스트</small></h3>
+        <div>
+          <div class="flowline k-a"><span class="st">신청전</span><span class="ar">→</span><span class="st">신청완료</span><span class="or">/</span><span class="st">신청불필요</span><span class="or">/</span><span class="st new">재판매신청불필요</span></div>
+          <ul>
+            <li>취소 처리되면 기본값 <b>신청전</b></li>
+            <li>매입처에 반품신청서를 작성하면 <b>신청완료</b>. 신청완료 건만 반품배송 진행</li>
+            <li>매입처 발주상태가 취소이고 미차감이면 <b>신청불필요</b>. 재고에서 제외하고 종료</li>
+            <li>회수완료·입고 상태에서 판매되면 <b>재판매신청불필요</b> <span class="tag k-a">추가</span> — 자동 선택 또는 사용자 선택. 이미 낸 신청서의 철회는 견적팀이 매입처와 직접 처리</li>
+          </ul>
+        </div>
+      </div>
+      <div class="def">
+        <h3>B. 회수<small>물류팀</small></h3>
+        <div>
+          <div class="flowline k-b"><span class="st">회수전</span><span class="ar">→</span><span class="st">회수중</span><span class="ar">→</span><span class="st">회수완료</span><span class="or">/</span><span class="nl">null</span></div>
+          <ul>
+            <li>기본값 <b>회수전</b> (문서의 "미회수")</li>
+            <li>공장에서 회수를 시작하면 <b>회수중</b></li>
+            <li>회수해서 입고되면 <b>회수완료</b>. 이때부터 판매 가능</li>
+            <li>신청불필요 건은 공장으로 나가지 않았으므로 <b>null</b></li>
+          </ul>
+        </div>
+      </div>
+      <div class="def">
+        <h3>C. 반품배송<small>물류팀</small></h3>
+        <div>
+          <div class="flowline k-c"><span class="st">입고</span><span class="ar">→</span><span class="st">출고준비</span><span class="ar">→</span><span class="st">배송중</span><span class="ar">→</span><span class="st">배송완료</span><span class="or">/</span><span class="nl">null</span></div>
+          <ul>
+            <li>기본값 <b>입고</b>. 다음날 반품하지 않는 부품은 입고 유지</li>
+            <li>신청완료 부품 중 다음날 반품할 부품은 <b>출고준비</b>. 이때부터 판매 불가</li>
+            <li>반품배송이 출발하면 <b>배송중</b>, 도착하면 <b>배송완료</b></li>
+            <li>재판매·신청불필요 건은 <b>null</b></li>
+          </ul>
+        </div>
+      </div>
+      <div class="def">
+        <h3>D. 계산서 취소<small>회계팀</small></h3>
+        <div>
+          <div class="flowline k-d"><span class="st">취소전</span><span class="ar">→</span><span class="st">취소요청중</span><span class="ar">→</span><span class="st">취소완료</span><span class="or">/</span><span class="nl">null</span></div>
+          <ul>
+            <li>기본값 <b>취소전</b></li>
+            <li>반품배송완료 이후 <b>취소요청중</b></li>
+            <li>매입처의 계산서 취소를 확인하면 <b>취소완료</b>. 재고에서 반품완료로 출고</li>
+            <li>재판매·신청불필요 건은 <b>null</b>이며 회계팀 목록에서 제외</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>판매·재고 규칙</h2></div>
+    <div class="scroll">
+      <table class="rules">
+        <thead><tr><th>구간</th><th>판매</th><th>재고</th></tr></thead>
+        <tbody>
+          <tr><td>취소 처리 ~ 회수완료 전</td><td class="no">불가</td><td>포함</td></tr>
+          <tr><td>신청불필요 선택</td><td class="no">불가</td><td class="out">제외</td></tr>
+          <tr><td>회수완료 + 입고 (출고준비 전, 신청서 상태 무관)</td><td class="ok">가능</td><td>포함</td></tr>
+          <tr><td>판매됨 → 재판매신청불필요</td><td>—</td><td class="out">판매 출고</td></tr>
+          <tr><td>출고준비 ~ 계산서 취소완료 전</td><td class="no">불가</td><td>포함</td></tr>
+          <tr><td>계산서 취소완료</td><td>—</td><td class="out">반품완료 출고</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>개발 반영 사항</h2></div>
+    <div class="dev">
+      <ul>
+        <li><span class="who">주문상세 · 취소</span><b>발송 전 취소</b>는 주문에서 부품 삭제 후 종료</li>
+        <li><span class="who">주문상세 · 취소</span><b>발송 후 취소</b>는 미입고분을 입고 처리한 뒤 취소, 취소와 동시에 재고 전환</li>
+        <li><span class="who">취소리스트</span>반품신청서 상태 4종: 신청전 / 신청완료 / 신청불필요 / <b>재판매신청불필요</b></li>
+        <li><span class="who">취소리스트</span><b>신청불필요</b> 선택 시 재고에서 제외, 회수·반품배송·계산서 취소 null, 각 팀 목록에서 제외</li>
+      </ul>
+      <ul>
+        <li><span class="who">재고 · 판매</span>판매 가능 조건은 <b>회수완료 + 입고</b> (출고준비 전)</li>
+        <li><span class="who">재고 · 판매</span>판매 시 <b>재판매신청불필요</b> 자동 선택 또는 사용자 선택, 반품배송·계산서 취소 null</li>
+        <li><span class="who">물류</span><b>출고준비</b> 전환은 신청완료 건만 가능, 출고준비부터 판매 불가</li>
+        <li><span class="who">회계 · 재고</span><b>계산서 취소완료</b> 시 재고에서 반품완료로 출고</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.getElementById('flow');
+  const el = (tag, attrs, parent, text) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    if (parent) parent.appendChild(e);
+    return e;
+  };
+  const tw = (s, size) => {
+    let w = 0;
+    for (const ch of s) w += /[ㄱ-힝]/.test(ch) ? size : (ch === ' ' ? size * .32 : size * .6);
+    return w;
+  };
+  const H = 1490;
+
+  const defs = el('defs', {}, svg);
+  ['ah','ah-para','ah-gate'].forEach(id => {
+    const m = el('marker', {id, viewBox:'0 0 10 10', refX:'9', refY:'5', markerWidth:'9', markerHeight:'9', markerUnits:'userSpaceOnUse', orient:'auto-start-reverse'}, defs);
+    el('path', {d:'M0,0 L10,5 L0,10 z', class:id}, m);
+  });
+
+  const lanes = [
+    {x:0,   w:340, t:'견적팀', s:'취소 · 반품신청서'},
+    {x:340, w:300, t:'물류팀', s:'회수 · 반품배송'},
+    {x:640, w:260, t:'재고 · 판매', s:'시스템 반영', sys:true},
+    {x:900, w:260, t:'회계팀', s:'계산서 취소'}
+  ];
+  lanes.forEach((l, i) => {
+    el('rect', {x:l.x, y:0, width:l.w, height:H, class:'lane-bg' + (l.sys ? ' sys' : '')}, svg);
+    el('rect', {x:l.x, y:0, width:l.w, height:56, class:'lane-head'}, svg);
+    el('text', {x:l.x + 20, y:25, class:'lane-title'}, svg, l.t);
+    el('text', {x:l.x + 20, y:44, class:'lane-sub'}, svg, l.s);
+    if (i > 0) el('line', {x1:l.x, y1:0, x2:l.x, y2:H, class:'lane-sep'}, svg);
+  });
+  el('line', {x1:0, y1:56, x2:1160, y2:56, class:'lane-sep'}, svg);
+
+  const C = (t, k) => ({t, k});
+  const nodes = [
+    // 견적팀
+    {x:245, y:120, w:150, h:90, type:'decision', title:'매입처 발송?'},
+    {x:75,  y:120, w:110, h:56, type:'end', title:'주문에서 삭제', sub:'프로세스 종료'},
+    {x:245, y:220, w:190, h:56, type:'step', title:'주문상세에서 취소', fixed:true},
+    {x:245, y:320, w:150, h:90, type:'decision', title:'입고 완료?', sub:'주문수량 기준', fixed:true},
+    {x:80,  y:380, w:130, h:56, type:'step', title:'입고 처리', sub:'미입고분', fixed:true},
+    {x:245, y:450, w:170, h:56, type:'step', title:'취소사유 저장', fixed:true},
+    {x:245, y:450, w:190, h:76, type:'step', title:'취소 처리', chips:[C('신청전','a'),C('회수전','b'),C('취소전','d')]},
+    {x:245, y:580, w:170, h:96, type:'decision', title:'발주취소·미차감?', sub:'매입처 기준'},
+    {x:80,  y:700, w:130, h:76, type:'step', title:'공장 미출고 건', chips:[C('신청불필요','a')]},
+    {x:80,  y:820, w:130, h:56, type:'end', title:'재고에서 제외', sub:'프로세스 종료'},
+    {x:245, y:700, w:170, h:76, type:'step', title:'반품신청서 작성', chips:[C('신청완료','a')]},
+    // 물류팀
+    {x:490, y:580, w:220, h:76, type:'step', title:'공장에서 회수 착수', chips:[C('회수중','b')]},
+    {x:490, y:700, w:220, h:76, type:'step', title:'회수완료 · 입고', chips:[C('회수완료','b'),C('입고','c')]},
+    {x:490, y:840, w:200, h:100, type:'decision', title:'다음날 반품?', sub:'신청완료 건만'},
+    {x:490, y:970, w:210, h:76, type:'step', title:'출고준비', chips:[C('출고준비','c'),C('판매 불가','bad')]},
+    {x:490, y:1080, w:210, h:76, type:'step', title:'반품배송 출발', chips:[C('배송중','c')]},
+    {x:490, y:1190, w:210, h:76, type:'step', title:'반품배송 완료', chips:[C('배송완료','c')]},
+    // 재고 · 판매
+    {x:770, y:450, w:210, h:76, type:'step sys', title:'재고 전환', chips:[C('재고 포함','s'),C('판매 불가','bad')]},
+    {x:770, y:700, w:210, h:76, type:'step sys', title:'회수완료 부품', chips:[C('판매 가능','good')]},
+    {x:770, y:830, w:210, h:92, type:'step sys', title:'재판매 처리', sub:'자동 또는 사용자 선택', chips:[C('재판매신청불필요','a')]},
+    {x:770, y:950, w:210, h:56, type:'end', title:'판매 출고', sub:'반품배송 · 계산서 취소 null'},
+    {x:770, y:1300, w:210, h:64, type:'end', title:'반품완료 출고', sub:'재고에서 차감 · 종료'},
+    // 회계팀
+    {x:1030, y:450, w:210, h:76, type:'note', title:'계산서 취소 기본값', chips:[C('취소전','d')]},
+    {x:1030, y:580, w:210, h:64, type:'note', title:'신청불필요 · 재판매 건', sub:'상태 null · 목록 제외'},
+    {x:1030, y:1190, w:210, h:76, type:'step', title:'계산서 취소 요청', chips:[C('취소요청중','d')]},
+    {x:1030, y:1300, w:210, h:76, type:'step', title:'매입처 취소 확인', chips:[C('취소완료','d')]}
+  ];
+
+  const edges = [
+    {p:[[170,120],[130,120]], l:'발송 전', lx:150, ly:106},
+    {p:[[245,165],[245,198]], l:'발송 후', lx:257, ly:182, a:'start', fixed:true},
+    {p:[[245,248],[245,275]], fixed:true},
+    {p:[[170,320],[80,320],[80,352]], l:'아니오 · 미입고', lx:125, ly:308, fixed:true},
+    {p:[[245,365],[245,422]], l:'예', lx:257, ly:394, a:'start', fixed:true},
+    {p:[[80,408],[80,450],[160,450]], fixed:true},
+    {p:[[245,478],[245,522]], fixed:true},
+    {p:[[340,450],[665,450]], k:'para', l:'취소와 동시', lx:500, ly:438},
+    {p:[[245,488],[245,532]]},
+    {p:[[160,580],[80,580],[80,662]], l:'예', lx:118, ly:568},
+    {p:[[80,738],[80,792]]},
+    {p:[[245,628],[245,662]], l:'아니오', lx:257, ly:646, a:'start'},
+    {p:[[330,580],[380,580]], k:'para', l:'동시 진행', lx:355, ly:564},
+    {p:[[490,618],[490,662]]},
+    {p:[[600,700],[665,700]]},
+    {p:[[770,488],[770,662]], k:'dot', noArrow:true, l:'회수 전 판매 불가', lx:782, ly:560, a:'start', sys:true},
+    {p:[[490,738],[490,790]]},
+    {p:[[330,700],[360,700],[360,840],[390,840]], k:'gate', l:'신청완료', lx:348, ly:772, rot:90},
+    {p:[[590,840],[625,840],[625,720],[600,720]], l:'아니오 · 입고 유지', lx:612, ly:784, rot:90},
+    {p:[[490,890],[490,932]], l:'예', lx:502, ly:911, a:'start'},
+    {p:[[490,1008],[490,1042]]},
+    {p:[[490,1118],[490,1152]]},
+    {p:[[595,1190],[925,1190]], l:'배송완료 후', lx:770, ly:1177, sys:true},
+    {p:[[1030,1228],[1030,1262]]},
+    {p:[[925,1300],[875,1300]]},
+    {p:[[770,738],[770,784]], l:'판매 시', lx:782, ly:761, a:'start', sys:true},
+    {p:[[770,876],[770,922]]}
+  ];
+
+  // 상단 취소 진입 단계가 늘어난 만큼 이후 단계를 아래로 이동
+  const DY = 110, TOP = 140;
+  nodes.forEach(n => { if (!n.fixed && n.y > TOP) n.y += DY; });
+  edges.forEach(e => {
+    if (e.fixed) return;
+    e.p.forEach(pt => { if (pt[1] > TOP) pt[1] += DY; });
+    if (e.ly > TOP) e.ly += DY;
+  });
+
+  const edgeLayer = el('g', {}, svg);
+  const labelLayer = [];
+  edges.forEach(e => {
+    const d = e.p.map((pt, i) => (i ? 'L' : 'M') + pt[0] + ',' + pt[1]).join(' ');
+    const k = e.k || '';
+    const attrs = {d, class:'edge ' + k};
+    if (!e.noArrow) attrs['marker-end'] = 'url(#' + (k === 'para' ? 'ah-para' : k === 'gate' ? 'ah-gate' : 'ah') + ')';
+    el('path', attrs, edgeLayer);
+    if (e.l) labelLayer.push(e);
+  });
+
+  nodes.forEach(n => {
+    const g = el('g', {class:'node ' + n.type}, svg);
+    const x0 = n.x - n.w / 2, y0 = n.y - n.h / 2;
+    if (n.type === 'decision') {
+      el('polygon', {points:`${n.x},${y0} ${n.x + n.w / 2},${n.y} ${n.x},${y0 + n.h} ${x0},${n.y}`, class:'shape'}, g);
+    } else {
+      el('rect', {x:x0, y:y0, width:n.w, height:n.h, rx:n.type === 'end' ? n.h / 2 : 5, class:'shape'}, g);
+    }
+    const rows = [{kind:'title', h:18}];
+    if (n.sub) rows.push({kind:'sub', h:15});
+    if (n.chips) rows.push({kind:'chips', h:20});
+    const gap = n.type === 'decision' ? 4 : 8;
+    const total = rows.reduce((s, r) => s + r.h, 0) + gap * (rows.length - 1);
+    let cy = n.y - total / 2;
+    rows.forEach(r => {
+      const mid = cy + r.h / 2;
+      if (r.kind === 'title') el('text', {x:n.x, y:mid, 'text-anchor':'middle', 'dominant-baseline':'central', class:'n-title'}, g, n.title);
+      if (r.kind === 'sub') el('text', {x:n.x, y:mid, 'text-anchor':'middle', 'dominant-baseline':'central', class:'n-sub'}, g, n.sub);
+      if (r.kind === 'chips') {
+        const widths = n.chips.map(c => tw(c.t, 11.5) + 14);
+        const cg = 6;
+        let cx = n.x - (widths.reduce((a, b) => a + b, 0) + cg * (widths.length - 1)) / 2;
+        n.chips.forEach((c, i) => {
+          const chip = el('g', {class:'chip k-' + c.k}, g);
+          el('rect', {x:cx, y:mid - 10, width:widths[i], height:20, rx:3}, chip);
+          el('text', {x:cx + widths[i] / 2, y:mid, 'text-anchor':'middle', 'dominant-baseline':'central'}, chip, c.t);
+          cx += widths[i] + cg;
+        });
+      }
+      cy += r.h + gap;
+    });
+  });
+
+  labelLayer.forEach(e => {
+    const t = el('text', {x:e.lx, y:e.ly, class:'elabel ' + (e.k || '') + (e.sys ? ' sys' : ''), 'text-anchor':e.a || 'middle', 'dominant-baseline':'middle'}, svg, e.l);
+    if (e.rot) t.setAttribute('transform', `rotate(${e.rot} ${e.lx} ${e.ly})`);
+  });
+
+  // matrix
+  const rep = (v, n) => Array(n).fill(v);
+  const N = null;
+  const scenarios = {
+    ret: {
+      note:'신청서 작성과 회수는 동시에 진행되므로 두 단계의 순서는 바뀔 수 있습니다. 출고준비 전까지 신청완료가 되어 있어야 합니다.',
+      events:[['취소 처리','견적팀'],['회수 착수','물류팀'],['신청서 작성','견적팀'],['회수완료','물류팀'],['출고준비','물류팀'],['배송 출발','물류팀'],['배송완료','물류팀'],['계산서 취소완료','회계팀']],
+      rows:[
+        ['A','반품신청서','a',['신청전','신청전', ...rep('신청완료',6)]],
+        ['B','회수','b',['회수전','회수중','회수중', ...rep('회수완료',5)]],
+        ['C','반품배송','c',[...rep('입고',4),'출고준비','배송중','배송완료','배송완료']],
+        ['D','계산서 취소','d',[...rep('취소전',6),'취소요청중','취소완료']],
+        ['','판매','sale',['불가','불가','불가','가능','불가','불가','불가','—']],
+        ['','재고','s',[...rep('포함',7),'반품완료 출고']]
+      ]
+    },
+    resale: {
+      note:'회수완료·입고 상태라면 신청서 상태(신청전 또는 신청완료)와 관계없이 판매할 수 있습니다. 신청완료 후 판매되면 매입처 신청서 철회는 견적팀이 직접 처리합니다.',
+      events:[['취소 처리','견적팀'],['회수 착수','물류팀'],['신청서 작성','견적팀'],['회수완료','물류팀'],['판매','재고 · 판매']],
+      rows:[
+        ['A','반품신청서','a',['신청전','신청전','신청완료','신청완료','재판매신청불필요']],
+        ['B','회수','b',['회수전','회수중','회수중','회수완료','회수완료']],
+        ['C','반품배송','c',['입고','입고','입고','입고',N]],
+        ['D','계산서 취소','d',['취소전','취소전','취소전','취소전',N]],
+        ['','판매','sale',['불가','불가','불가','가능','판매됨']],
+        ['','재고','s',['포함','포함','포함','포함','판매 출고']]
+      ]
+    },
+    none: {
+      note:'매입처 발주상태가 취소이고 미차감인 부품은 공장으로 나가지 않았으므로 회수·반품배송·계산서 취소 없이 재고에서 제외하고 끝납니다.',
+      events:[['취소 처리','견적팀'],['신청불필요 선택','견적팀']],
+      rows:[
+        ['A','반품신청서','a',['신청전','신청불필요']],
+        ['B','회수','b',['회수전',N]],
+        ['C','반품배송','c',['입고',N]],
+        ['D','계산서 취소','d',['취소전',N]],
+        ['','판매','sale',['불가','불가']],
+        ['','재고','s',['포함','제외']]
+      ]
+    }
+  };
+  const table = document.getElementById('matrix');
+  const noteEl = document.getElementById('matrix-note');
+  function render(key) {
+    const s = scenarios[key];
+    let h = '<thead><tr><th scope="col">상태값</th>';
+    s.events.forEach((e, i) => {
+      h += `<th scope="col"><span class="step">${String(i + 1).padStart(2, '0')}</span>${e[0]}<small>${e[1]}</small></th>`;
+    });
+    h += '</tr></thead><tbody>';
+    s.rows.forEach(([code, name, k, vals]) => {
+      h += `<tr><th scope="row">${name}${code ? `<small>${code}</small>` : ''}</th>`;
+      vals.forEach((v, i) => {
+        if (v === null) { h += '<td><span class="v null">null</span></td>'; return; }
+        if (v === '—') { h += '<td><span class="v">—</span></td>'; return; }
+        const chg = i === 0 || v !== vals[i - 1];
+        let kk = k;
+        if (k === 'sale') kk = v === '가능' ? 'good' : v === '불가' ? 'bad' : 's';
+        h += `<td><span class="${chg ? 'v chg k-' + kk : 'v'}">${v}</span></td>`;
+      });
+      h += '</tr>';
+    });
+    table.innerHTML = h + '</tbody>';
+    noteEl.textContent = '색이 칠해진 칸은 해당 단계에서 값이 바뀌는 곳입니다. ' + s.note;
+  }
+  document.querySelectorAll('input[name="scn"]').forEach(r => r.addEventListener('change', e => render(e.target.value)));
+  render(document.querySelector('input[name="scn"]:checked').value);
+})();
+</script>
+</body>
+</html>
