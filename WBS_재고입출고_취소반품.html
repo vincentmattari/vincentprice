@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>재고 입출고 · 부품 취소·반품</title>
+<style>
+:root{
+  --title:#3e6ad4;
+  --bar:#4d7fe6;
+  --bar-sum:#2f62c8;
+  --ink:#222;
+  --line:#d5d5d5;
+  --line-strong:#b7b7b7;
+  --head:#fff;
+  --bg:#f3f4f6;
+  --sticky:#fff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",sans-serif;font-size:13px}
+.page{padding:28px 24px 48px}
+.sheet{background:#fff;border:1px solid #cfcfcf;overflow:auto;max-height:calc(100vh - 56px)}
+table{border-collapse:separate;border-spacing:0;table-layout:fixed}
+th,td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:#fff;font-weight:400;padding:0 8px;vertical-align:middle}
+thead th{position:sticky;background:var(--head);font-weight:600;text-align:center;white-space:nowrap;z-index:4}
+.title{background:var(--title);color:#fff;font-size:16px;font-weight:700;text-align:center;height:42px;letter-spacing:-0.01em;border-right:none;top:0;z-index:8}
+.month{top:42px;height:32px;z-index:5}
+.rh{height:32px;top:74px;z-index:5}
+.rd{height:40px}
+td.tl{padding:0}
+th.day{padding:0 1px;font-size:11px;font-weight:500;color:#333}
+th.day.off{background:#eef0f3;color:#8b919a}
+.offday{position:absolute;top:0;bottom:0;background:#f4f5f7;z-index:0}
+td.num,td.date{text-align:center;font-variant-numeric:tabular-nums}
+td.name{text-align:left;padding-left:12px;font-weight:600}
+tr.phase td{border-top:1px solid var(--line-strong)}
+tr.sum td{background:#f7f8fa;font-weight:700;border-top:1px solid var(--line-strong)}
+tr.sum td.name{font-weight:700}
+.track{position:relative;height:40px}
+.bar{position:absolute;top:12px;height:16px;border-radius:2px;background:var(--bar);min-width:2px;z-index:1}
+tr.sum .bar{background:var(--bar-sum);top:14px;height:12px}
+.vline{position:absolute;top:0;bottom:0;width:1px;background:var(--line);pointer-events:none;z-index:1}
+.vline.month{background:#9aa3b2}
+.sticky{position:sticky;background:var(--sticky);z-index:2}
+thead .sticky{z-index:6;background:#fff;top:42px}
+tr.sum .sticky{background:#f7f8fa}
+.s0{left:0}
+.s1{left:var(--l1)}
+.s2{left:var(--l2)}
+.s3{left:var(--l3)}
+.s4{left:var(--l4)}
+@media print{
+  body{background:#fff}
+  .page{padding:0}
+  .sheet{max-height:none;overflow:visible;border:none}
+  .sticky{position:static}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="sheet" id="sheet"></div>
+</div>
+<script>
+const DAY = 36;
+const LEFT = [52, 320, 104, 112, 112];
+const HOLIDAYS = new Set(["2026-09-24", "2026-09-25", "2026-10-03", "2026-10-05", "2026-10-09", "2026-12-25"]);
+
+const pad = n => String(n).padStart(2, "0");
+const ymd = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+const parse = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const dayDiff = (a, b) => Math.round((b - a) / 86400000);
+
+function isOff(d, holiday) {
+  const w = d.getDay();
+  if (w === 0 || w === 6) return true;
+  return holiday && HOLIDAYS.has(ymd(d));
+}
+function addWork(d, n, holiday) {
+  const x = new Date(d);
+  let left = n;
+  while (left > 0) {
+    x.setDate(x.getDate() + 1);
+    if (!isOff(x, holiday)) left--;
+  }
+  return x;
+}
+function workCount(start, end, holiday) {
+  let n = 0;
+  for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
+    if (!isOff(d, holiday)) n++;
+  }
+  return n;
+}
+function phase(name, tip, start, end, holiday, barFromStart) {
+  return { name: name, tip: tip, start: start, end: end, days: workCount(start, end, holiday), barFromStart: !!barFromStart };
+}
+
+function schedule(start, holiday) {
+  const y = start.getFullYear();
+  const plan = phase(
+    "재고 매입가 재산정 및 <br/>입출고 정형화 서비스 기획<br/>부품 취소·반품 서비스 기획",
+    "재고 매입가 재산정, 입출고 정형화 서비스 기획, 부품 취소·반품 서비스 기획",
+    new Date(y, 8, 5), new Date(y, 8, 16), holiday, true
+  );
+  const stock = phase(
+    "재고 입출고 정형화 개발 및 테스트 배포",
+    "매입처 취소 입고, 카랑재고 취소 입고, 부품 회수, 재고관리 입출고, 개발·테스트·배포",
+    new Date(y, 8, 17), new Date(y, 9, 8), holiday, false
+  );
+  const retStart = addWork(stock.end, 1, holiday);
+  const retEnd = new Date(y, 9, 30);
+  const ret = phase(
+    "부품 취소·반품 서비스 개발 및 테스트 배포",
+    "10월 12일~10월 30일",
+    retStart, retEnd, holiday, false
+  );
+  const qaStart = addWork(ret.end, 1, holiday);
+  const qa = phase(
+    "재고 매입가 재산정 개발 및 테스트 배포",
+    "유형별 확인, 문서, 배포 목록",
+    qaStart, addWork(qaStart, 4, holiday), holiday, false
+  );
+  return [plan, stock, ret, qa];
+}
+
+function buildDays(rangeStart, rangeEnd, holiday) {
+  const last = new Date(rangeEnd.getFullYear(), rangeEnd.getMonth() + 1, 0);
+  const days = [];
+  const months = [];
+  for (let d = new Date(rangeStart); d <= last; d = addDays(d, 1)) {
+    const key = d.getFullYear() + "-" + d.getMonth();
+    if (!months.length || months[months.length - 1].key !== key) {
+      months.push({ key: key, label: (d.getMonth() + 1) + "월", count: 0 });
+    }
+    months[months.length - 1].count++;
+    days.push({
+      date: new Date(d),
+      label: String(d.getDate()),
+      off: isOff(d, holiday),
+      monthStart: d.getDate() === 1
+    });
+  }
+  return { days: days, months: months };
+}
+
+function render() {
+  const holiday = true;
+  const phases = schedule(new Date(2026, 8, 5), holiday);
+  const first = phases[0].start;
+  const last = phases[phases.length - 1].end;
+  const rangeStart = new Date(first.getFullYear(), 8, 5);
+  const scale = buildDays(rangeStart, last, holiday);
+  const days = scale.days;
+  const totalDays = days.length;
+  const leftW = LEFT.reduce((s, n) => s + n, 0);
+  const offsets = [];
+  LEFT.reduce((s, n, i) => { offsets[i] = s; return s + n; }, 0);
+
+  let lines = "";
+  let shade = "";
+  days.forEach((day, i) => {
+    if (i > 0) {
+      lines += '<i class="vline' + (day.monthStart ? " month" : "") + '" style="left:' + (i / totalDays * 100) + '%"></i>';
+    }
+    if (day.off) shade += '<i class="offday" style="left:' + (i / totalDays * 100) + "%;width:" + (1 / totalDays * 100) + '%"></i>';
+  });
+  const track = shade + lines;
+  const cols = LEFT.map(w => '<col style="width:' + w + 'px">').join("")
+    + days.map(() => '<col style="width:' + DAY + 'px">').join("");
+
+  let monthHead = "";
+  scale.months.forEach(mo => { monthHead += '<th class="month" colspan="' + mo.count + '">' + mo.label + "</th>"; });
+  const wk = "일월화수목금토";
+  let dayHead = "";
+  days.forEach(day => {
+    dayHead += '<th class="rh day' + (day.off ? " off" : "") + '" title="' + ymd(day.date) + " " + wk[day.date.getDay()] + '">' + day.label + "</th>";
+  });
+  const heads = ["NO.", "작업내용", "근무시간(일)", "시작 시간", "종료 시간"];
+  let headLeft = "";
+  heads.forEach((h, i) => { headLeft += '<th class="sticky s' + i + '" rowspan="2">' + h + "</th>"; });
+
+  let body = "";
+  phases.forEach((p, i) => {
+    const bar = barHtml(p.start, p.end, rangeStart, totalDays, holiday, p.name + " · " + p.tip, p.barFromStart);
+    body += '<tr class="phase"><td class="num sticky s0">' + (i + 1) + "</td>";
+    body += '<td class="name rd sticky s1" title="' + esc(p.tip) + '">' + p.name + "</td>";
+    body += '<td class="num sticky s2">' + p.days + "</td>";
+    body += '<td class="date sticky s3">' + ymd(p.start) + "</td>";
+    body += '<td class="date sticky s4">' + ymd(p.end) + "</td>";
+    body += '<td class="tl" colspan="' + totalDays + '"><div class="track">' + track + bar + "</div></td></tr>";
+  });
+
+  const sumDays = phases.reduce((n, p) => n + p.days, 0);
+  body += '<tr class="sum"><td class="sticky s0"></td><td class="name sticky s1">합계</td>';
+  body += '<td class="num sticky s2">' + sumDays + "</td>";
+  body += '<td class="date sticky s3">' + ymd(first) + "</td>";
+  body += '<td class="date sticky s4">' + ymd(last) + "</td>";
+  body += '<td class="tl" colspan="' + totalDays + '"><div class="track">' + track
+    + barHtml(first, last, rangeStart, totalDays, holiday, "전체 기간", true) + "</div></td></tr>";
+
+  document.getElementById("sheet").innerHTML =
+    '<table style="width:' + (leftW + totalDays * DAY) + "px;--l1:" + offsets[1] + "px;--l2:" + offsets[2]
+    + "px;--l3:" + offsets[3] + "px;--l4:" + offsets[4] + 'px">'
+    + "<colgroup>" + cols + "</colgroup><thead><tr><th class=\"title\" colspan=\""
+    + (5 + totalDays) + "\">재고 입출고 · 부품 취소·반품</th></tr><tr>"
+    + headLeft + monthHead + "</tr><tr>" + dayHead + "</tr></thead><tbody>" + body + "</tbody></table>";
+}
+
+function barHtml(start, end, rangeStart, totalDays, holiday, title, paintStart) {
+  let html = "";
+  let seg = null;
+  let firstDay = true;
+  const last = new Date(end);
+  for (let d = new Date(start); d <= last; d = addDays(d, 1)) {
+    const off = isOff(d, holiday) && !(paintStart && firstDay);
+    firstDay = false;
+    if (off) {
+      if (seg) {
+        html += barDiv(seg, addDays(d, -1), rangeStart, totalDays, title);
+        seg = null;
+      }
+    } else if (!seg) {
+      seg = new Date(d);
+    }
+  }
+  if (seg) html += barDiv(seg, last, rangeStart, totalDays, title);
+  return html;
+}
+function barDiv(start, end, rangeStart, totalDays, title) {
+  const left = dayDiff(rangeStart, start) / totalDays * 100;
+  const width = (dayDiff(start, end) + 1) / totalDays * 100;
+  return '<div class="bar" style="left:' + left + "%;width:" + width + '%" title="' + esc(title) + '"></div>';
+}
+function esc(s) {
+  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+render();
+</script>
+</body>
+</html>
